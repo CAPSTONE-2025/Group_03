@@ -3,9 +3,33 @@
 | ----------- | --------- | --------- | --------------------------- |
 | Jimbert Manalo  | Back-End Dev | Jimbert12 | jmanalo11@myseneca.ca |
 | Seongjun Kim  | Front-End Dev |skim477 | skim477@myseneca.ca |
-| Gary Hu  | front-End Dev | garyhch0702 | chu34@myseneca.ca |
+| Gary Hu  | Front-End Dev | garyhch0702 | chu34@myseneca.ca |
 
 ## Project Description
+**TeamWorks** is a web application designed to streamline workflow and team management. It provides an intuitive platform for managing tasks, team collaboration, and project progress. Inspired by tools like Jira, TeamWorks aims to cater to both small teams and large organizations by simplifying the complexities of project management.
+
+### Key Features
+1. **Task Management**:
+   - Create, assign, and track tasks in real time.
+   - Set deadlines and priorities for better project execution.
+
+2. **Team Collaboration**:
+   - Assign roles and responsibilities to team members.
+   - Communicate effectively with in-app notifications and updates.
+
+3. **Progress Tracking**:
+   - Monitor project milestones and deadlines.
+   - Visualize progress through charts and dashboards.
+
+4. **Customizable Interface**:
+   - Adapt the platform to different industries or team sizes.
+   - Use a responsive design that works across devices.
+
+5. **Real-Time Updates**:
+   - Stay informed about project changes with instant notifications.
+
+### Why TeamWorks?
+TeamWorks stands out as a simple yet powerful tool that eliminates the need for complex and expensive third-party APIs. The platform is fully customizable, scalable, and designed to support the unique needs of growing teams and businesses.
 
 ## Tech Stack
 
@@ -13,9 +37,15 @@
 
 In its backend, our website will be implemented using [Flask](https://flask.palletsprojects.com/en/stable/) to acquire flexibility when creating web-application. It will be hosted by [Vercel](https://vercel.com/login) as it is best for supporting React for front-end.
 
-### Frontend
+### Frontend:
+- **React.js**: A library for building dynamic and interactive user interfaces.
+- **Bootstrap**: A CSS framework to ensure responsive and clean design.
+- **Key Components**:
+  - **Dashboard**: Displays team performance metrics.
+  - **Task Board**: Allows task creation, assignment, and tracking.
+  - **Notifications**: Real-time updates for tasks and team activities.
+- **Styling**: Customized Bootstrap components for a professional look and responsive design.
 
-On the frontend, we choose to use [React](https://react.dev/) as our techonology along side with it for the framework we use [Bootstrap](https://getbootstrap.com/) to acquired a responisive web-appliation with a simplistic design.
 
 ### Database 
 
