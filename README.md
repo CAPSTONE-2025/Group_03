@@ -8,10 +8,10 @@ TeamWorks is a web application designed to simplify workflow and team management
 
 ## Team Members
 
-| Name           | GitHub Handle       | Email                  | Role       |
+| Name           | GitHub              | Email                  | Role       |
 |----------------|---------------------|------------------------|------------|
 | Chenghao Hu    | chu34               | chu34@myseneca.ca      | Frontend   |
-| Jimbert Manalo | @makjim21           |                        | Tech Stack |
+| Jimbert Manalo | Jimbert12           | jmanalo11@myseneca.ca  | Tech Stack |
 | Seongjun Kim   | @seongjun           | skim477@myseneca.ca    | Backend    |
 
 ---
@@ -55,3 +55,14 @@ TeamWorks is a web application designed to simplify workflow and team management
 1. Clone the repository:
    ```bash
    git clone https://github.com/CAPSTONE-2025/Group_03.git
+
+2. Create a new branch for your feature:
+   ```bash
+   git checkout -b feature-name
+3. Commit your changes:
+   ```bash
+    git commit -m "Add your commit message here"
+4.Push the branch and create a pull request:
+   ```bash
+   git push origin feature-name
+
