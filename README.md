@@ -59,10 +59,12 @@ TeamWorks is a web application designed to simplify workflow and team management
 2. Create a new branch for your feature:
    ```bash
    git checkout -b feature-name
+   
 3. Commit your changes:
    ```bash
-    git commit -m "Add your commit message here"
-4.Push the branch and create a pull request:
+   git commit -m "Add your commit message here"
+   
+4. Push the branch and create a pull request:
    ```bash
    git push origin feature-name
 
