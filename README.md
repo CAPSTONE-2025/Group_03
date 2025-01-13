@@ -44,6 +44,7 @@ In its backend, our website will be implemented using [Flask](https://flask.pall
   - **Dashboard**: Displays team performance metrics.
   - **Task Board**: Allows task creation, assignment, and tracking.
   - **Notifications**: Real-time updates for tasks and team activities.
+  - **Task Status**: Allows to see or update task status: "to do", "in progress", "done". Also, it have priority levels on each tasks.
 - **Styling**: Customized Bootstrap components for a professional look and responsive design.
 
 
