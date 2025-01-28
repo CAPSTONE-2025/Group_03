@@ -13,7 +13,7 @@
    - Create, assign, and track tasks in real time.
    - Set deadlines and priorities for better project execution.
 
-2. **Team Collaboration**:
+2. **Team Collaboration and Management**:
    - Assign roles and responsibilities to team members.
    - Communicate effectively with in-app notifications and updates.
 
@@ -28,6 +28,13 @@
 5. **Real-Time Updates**:
    - Stay informed about project changes with instant notifications.
 
+6. **Account Management**:
+   - Create and manage user accounts securely.
+
+7. **Visual Tool**:
+   - Utilize a Kanban Board for intuitive task management.
+
+
 ### Why TeamWorks?
 TeamWorks stands out as a simple yet powerful tool that eliminates the need for complex and expensive third-party APIs. The platform is fully customizable, scalable, and designed to support the unique needs of growing teams and businesses.
 
@@ -35,7 +42,7 @@ TeamWorks stands out as a simple yet powerful tool that eliminates the need for 
 
 ### Backend
 
-In its backend, our website will be implemented using [Flask](https://flask.palletsprojects.com/en/stable/) to acquire flexibility when creating web-application. It will be hosted by [Vercel](https://vercel.com/login) as it is best for supporting React for front-end.
+In its backend, our website will be implemented using Python and [Flask](https://flask.palletsprojects.com/en/stable/) to acquire flexibility when creating web-application. It will be hosted by [Vercel](https://vercel.com/login) as it is best for supporting React for front-end.
 
 ### Frontend:
 - **React.js**: A library for building dynamic and interactive user interfaces.
@@ -45,7 +52,11 @@ In its backend, our website will be implemented using [Flask](https://flask.pall
   - **Task Board**: Allows task creation, assignment, and tracking.
   - **Notifications**: Real-time updates for tasks and team activities.
   - **Task Status**: Allows to see or update task status: "to do", "in progress", "done". Also, it have priority levels on each tasks.
+  - **Account Page**: Enables secure user account creation and authentication.
+  - **Team Roles**: Allows to assigning roles and responsibilities such as product owner, manager, programmer.
+  - **Kanban Board**: Displays Kanban Board.
 - **Styling**: Customized Bootstrap components for a professional look and responsive design.
+
 
 
 ### Database 
