@@ -23,3 +23,30 @@ Our team agrees to the following guidelines to ensure smooth collaboration:
 - Decision-Making: Decisions will be made by consensus; if not possible, a majority vote will be used.
 
 - Continuous Improvement: The team should have regular reviews to reflect on what went well and identify areas for improvement.
+
+
+## Schedule
+
+This is a summary of guidelines for the project schedule.
+
+|     | Sprint 1        |   Sprint 2 |     Sprint 3    | Sprint 4       |
+| ----| --------------- | ---------- | --------------- | ------------------- |
+| Content  | README, dod, wa | tech stack | install and setup | prototype, MVP |
+| Due Date  | Jan 31, 2025 | Feb 21, 2025 | March 21, 2025 | April 11, 2025 |
+
+---
+
+## Signatures
+
+By signing below, each team members comforms that they read and agree to abide by the terms of the working agreement.
+- Seongjun Kim:
+Signature: Seongjun
+Date: Feb 4th, 2025
+
+- Jimbert Manalo:
+Signature: Jimbert
+Date: Feb 4th, 2025
+
+- Gary Hu:
+Signature: Gary
+Date: Feb 4th, 2025
