@@ -1,11 +1,19 @@
-import React from 'react';
-import TestComponent from '../components/TestComponent';
+import React, { useState, useEffect } from 'react';
+
 function HomePage() {
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    fetch('http://localhost:5000/')
+      .then((response) => response.json())
+      .then((data) => setMessage(data.message))
+      .catch((error) => console.error('Error fetching data:', error));
+  }, []);
+
   return (
-    <div className="container mt-5">
-      <h2>Home Page</h2>
-      <p>Welcome to the Home Page!</p>
-      < TestComponent />
+    <div className="container mt-4">
+      <h1 className="text-center">Home Page</h1>
+      <p className="text-center">{message}</p>
     </div>
   );
 }
