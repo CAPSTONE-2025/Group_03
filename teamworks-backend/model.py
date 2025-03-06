@@ -1,25 +1,27 @@
 from pymongo import MongoClient
 import certifi
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
 
-
-# Load the environment variables from the .env file
+# Load environment variables
 load_dotenv()
 
-# Get MongoDB URI from environment variable
-uri = os.getenv("MONGO_URI")
+# Get MongoDB URI from .env or use local MongoDB
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/teamworks_db")
 
-# Use certifi to get the proper CA file for SSL
-client = MongoClient(
-    uri,
-    tls=True,  # Use TLS/SSL
-    tlsCAFile=certifi.where()  # Provide the path to the CA bundle from certifi
-)
+# If using local MongoDB, disable SSL
+if "localhost" in MONGO_URI or "127.0.0.1" in MONGO_URI:
+    client = MongoClient(MONGO_URI)
+else:
+    client = MongoClient(MONGO_URI, tls=True, tlsCAFile=certifi.where())
 
-# Send a ping to confirm the connection
+# Select database
+db = client["teamworks_db"]
+calendar_collection = db["calendar_events"]
+
+# Test connection
 try:
-    client.admin.command('ping')
-    print("Pinged your deployment. You successfully connected to MongoDB!")
+    client.admin.command("ping")
+    print("✅ Connected to MongoDB!")
 except Exception as e:
-    print(e)
+    print(f"❌ MongoDB Connection Failed: {e}")
