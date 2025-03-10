@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
 import HomePage from './pages/Home';
 import AboutPage from './pages/About';
 import TaskCalendar from './components/Calendar';
+import BacklogPage from './pages/Backlog';
 
 function App() {
   return (
@@ -24,6 +25,9 @@ function App() {
                 <Link className="nav-link" to="/about">About</Link>
               </li>
               <li className="nav-item">
+                <Link className="nav-link" to="/backlog">Backlog Board</Link>
+              </li>
+              <li className="nav-item">
                 <Link className="nav-link" to="/calendar">Calendar</Link>
               </li>
             </ul>
@@ -37,6 +41,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/calendar" element={<TaskCalendar />} />
+          <Route path="/backlog" element={<BacklogPage />} />
         </Routes>
       </div>
     </Router>
