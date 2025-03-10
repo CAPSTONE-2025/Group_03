@@ -43,5 +43,40 @@ def delete_event(event_id):
         return jsonify({"error": "Event not found"}), 404
     return jsonify({"message": "Event deleted successfully"})
 
+@app.route('/backlog', methods=['GET'])
+def get_backlog():
+ return jsonify( [
+    {
+        "id": 1,
+        "title": "Login Page",
+        "description": "Implement login functionality",
+        "label": "Feature",
+        "status": "To Do",
+        "priority": "High",
+        "assignedTo": "Alice",
+        "dueDate": "2025-03-01",
+    },
+    {
+        "id": 2,
+        "title": "Dashboard UI",
+        "description": "Fix UI bug on dashboard",
+        "label": "Bug",
+        "status": "In Progress",
+        "priority": "Medium",
+        "assignedTo": "Bob",
+        "dueDate": "2025-03-05",
+    },
+    {
+        "id": 3,
+        "title": "Documentation",
+        "description": "Update documentation",
+        "label": "Task",
+        "status": "Done",
+        "priority": "Low",
+        "assignedTo": "Charlie",
+        "dueDate": "2025-03-10",
+    },
+])
+
 if __name__ == "__main__":
     app.run(debug=True)
