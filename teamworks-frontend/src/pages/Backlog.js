@@ -11,33 +11,31 @@ function Backlog() {
     const [selectedTaskId, setSelectedTaskId] = useState(null);
     const [editingTask, setEditingTask] = useState(null);
 
-    const handleSelectTask = (taskId) => {
-        // If the user selects the same task again, we can unselect it. Otherwise, select the new task.
-        setSelectedTaskId((prevId) => (prevId === taskId ? null : taskId));
-      };
-  // Handle delete for the selected task
-  const handleDeleteTask = () => {
-    if (!selectedTaskId) {
-      alert("Please select a task to delete.");
-      return;
-    }
-    // Remove the task from local state
-    setTasks((prevTasks) => prevTasks.filter((task) => task.id !== selectedTaskId));
-
-    // Clear the selection
-    setSelectedTaskId(null);
-  };
-
-
     useEffect(()=> {
         axios.get(API_URL)
         .then((response) => setTasks(response.data))
         .catch((error) => console.error("Error fetching tasks:", error));
     }, []);
 
-    const handleAddTask = (newTask) => {
-        setTasks([...tasks, newTask]);
-        setShowForm(false);
+
+    // CREATE (POST)
+    const handleAddTask = async (newTask) => {
+        try {
+            const response = await axios.post(API_URL, newTask);
+            newTask.id = response.data.id;
+
+            // Construct the new task with the actual Id from the DB
+            const createdTask = {
+                ...newTask,
+                id: response.data.id,
+            }
+
+            //update the state with the new task
+            setTasks([...tasks, createdTask]);
+            setShowForm(false);
+        } catch (error) {
+            console.error("Error adding task:", error);
+        }
     }
 
     const handleRowClick = (task) => {
@@ -45,9 +43,51 @@ function Backlog() {
         setShowForm(false);
       };
 
-    const handleEditTask = (updatedTask) => {
-        setTasks(tasks.map(task => task.id === updatedTask.id ? updatedTask : task));
-        setEditingTask(null);
+    
+    // UPDATE (PUT)
+    const handleEditTask = async (updatedTask) => {
+        try {
+            const response = await axios.put(`${API_URL}/${updatedTask.id}`, updatedTask);
+            console.log("Task updated:", response.data);
+
+            setTasks((prevTasks) => 
+                prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task))
+            );
+
+            setEditingTask(null);
+        } catch (error) {
+            console.error("Error updating task:", error);
+        }
+    };
+
+
+    const handleSelectTask = (taskId) => {
+        // If the user selects the same task again, we can unselect it. Otherwise, select the new task.
+        setSelectedTaskId((prevId) => (prevId === taskId ? null : taskId));
+      };
+
+
+    // DELETE (DELETE)
+    const handleDeleteTask = async () => {
+        if (!selectedTaskId) {
+            alert("Please select a task to delete.");
+        return;
+        }
+
+        try {
+            const response = await axios.delete(`${API_URL}/${selectedTaskId}`);
+            console.log("Task deleted:", response.data);
+
+            // Remove the task from local state
+            setTasks((prevTasks) => 
+                prevTasks.filter((task) => task.id !== selectedTaskId)
+            );
+
+            // Clear the selection
+            setSelectedTaskId(null);
+        } catch (error) {
+            console.error("Error deleting task:", error);
+        }
     };
 
 
