@@ -29,8 +29,8 @@ Our team agrees to the following guidelines to ensure smooth collaboration:
 
 This is a summary of guidelines for the project schedule.
 
-|     | Sprint 1        |   Sprint 2 |     Sprint 3    | Sprint 4       | Sprint 5 | Sprint 6 | Sprint 7 | Sprint 8
-| ----| --------------- | ---------- | --------------- | -------------- | -------- | -------------- | -------------- |
+|     | Sprint 1        |   Sprint 2 |     Sprint 3    | Sprint 4       | Sprint 5 | Sprint 6 | Sprint 7 | Sprint 8|
+| ----| --------------- | ---------- | --------------- | -------------- | -------- | -------------- | -------------- |--------------|
 | Content  | README, dod, wa | tech stack: install and setup frontend, backend, batabase. Implement basic UI in and simple "Hello World" route, create a basic homepage | Account management, Task management, calendar functionality | Kanban Board functionalities, prototype, MVP | additional functionalities in Task management | additional functionalities in Kanban Board   |  history fuctionality | deployment, Testing  |
 | Due Date  | Jan 24, 2025 | Feb 14, 2025 | Feb 28, 2025 | March 21, 2025  |  Sept, 2025 | Oct, 2025 | Nov, 2025 | Dec, 2025 |
 
