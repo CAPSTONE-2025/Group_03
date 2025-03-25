@@ -172,6 +172,14 @@ def signup():
         return jsonify({"error": "All fields are required"}), 400
 
     try:
+        users_collection = get_users_collection()
+
+        # Check if a user with the given email already exists
+        existing_user = users_collection.find_one({"email": data['email']})
+        if existing_user:
+            app.logger.warning("Attempt to create an account with an existing email.")
+            return jsonify({"error": "An account with this email already exists."}), 409
+        
         # Hash the password
         hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
 
