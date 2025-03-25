@@ -19,6 +19,9 @@ else:
 # Select database
 db = client["teamworks_db"]
 calendar_collection = db["calendar_events"]
+
+backlog_collection = db["backlog_items"]
+
 users_collection = db["users"]
 
 def get_users_collection():
