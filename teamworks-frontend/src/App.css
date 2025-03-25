@@ -36,3 +36,30 @@
     transform: rotate(360deg);
   }
 }
+
+.logo {
+  width: 100px;
+  height: auto;
+  margin-bottom: 1rem; 
+}
+.navbar {
+  height: 65px; 
+  display: flex;
+  align-items: center; 
+  background-color: #ff851b;
+
+}
+
+.jumbotron {
+  margin-top: 5px; 
+  display: flex;
+  justify-content: center; 
+  align-items: center;
+  height: 75vh; 
+}
+
+.signup-img {
+  width: 100%;             
+  object-fit: cover;      
+  border-radius: 15px;     
+}

@@ -1,11 +1,15 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from model import calendar_collection 
+from model import calendar_collection , get_users_collection
+
+import bcrypt
 from bson import ObjectId
 from model import backlog_collection
 
 app = Flask(__name__)
 CORS(app)
+
+CORS(app, origins=["http://localhost:3000"])
 
 @app.route('/')
 def home():
@@ -157,5 +161,63 @@ def delete_task(task_id):
         return jsonify({"error": "Task not found"}), 404
     return jsonify({"message": "Task deleted successfully"})
 
+@app.route('/signup', methods=['POST'])
+def signup():
+    data = request.json
+    app.logger.info(f"Received signup data: {data}")
+
+    # Check if the required fields are provided
+    if not data.get('firstName') or not data.get('lastName') or not data.get('email') or not data.get('password'):
+        app.logger.error("Missing required fields.")
+        return jsonify({"error": "All fields are required"}), 400
+
+    try:
+        # Hash the password
+        hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+
+        # Log the collection info to ensure it works
+        app.logger.info(f"Using collection: {str(get_users_collection())}")
+
+        # Store the user in MongoDB
+        user = {
+            "firstName": data["firstName"],
+            "lastName": data["lastName"],
+            "email": data["email"],
+            "password": hashed_password,
+        }
+        result = get_users_collection().insert_one(user)
+        app.logger.info(f"User created with ID: {result.inserted_id}")
+
+        return jsonify({"message": "User created successfully", "id": str(result.inserted_id)}), 201
+    except Exception as e:
+        app.logger.error(f"Error during signup: {e}")
+        return jsonify({"error": "An error occurred during signup."}), 500
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    app.logger.info(f"Received login data: {data}")
+
+    if not data.get('email') or not data.get('password'):
+        app.logger.error("Missing email or password.")
+        return jsonify({"error": "Email and password are required"}), 400
+
+    try:
+        user = get_users_collection().find_one({"email": data['email']})
+        if user and bcrypt.checkpw(data['password'].encode('utf-8'), user['password']):
+            return jsonify({"message": "Login successful", "user": {
+                "id": str(user['_id']),
+                "firstName": user['firstName'],
+                "lastName": user['lastName'],
+                "email": user['email']
+            }}), 200
+        else:
+            return jsonify({"error": "Invalid email or password"}), 401
+    except Exception as e:
+        app.logger.error(f"Error during login: {e}")
+        return jsonify({"error": "An error occurred during login."}), 500
+
+
+    
 if __name__ == "__main__":
     app.run(debug=True)

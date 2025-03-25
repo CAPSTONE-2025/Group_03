@@ -1,3 +1,4 @@
+# model.py
 from pymongo import MongoClient
 import certifi
 import os
@@ -18,7 +19,13 @@ else:
 # Select database
 db = client["teamworks_db"]
 calendar_collection = db["calendar_events"]
+
 backlog_collection = db["backlog_items"]
+
+users_collection = db["users"]
+
+def get_users_collection():
+    return users_collection
 
 # Test connection
 try:
