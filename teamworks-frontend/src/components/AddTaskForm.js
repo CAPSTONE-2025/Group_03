@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState} from 'react';
 
 function AddTaskForm({ onAdd, onCancel }) {
     const [newTask, setNewTask] = useState([
