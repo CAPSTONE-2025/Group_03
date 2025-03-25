@@ -58,6 +58,11 @@ function App() {
           ) : (
             <Route path="*" element={<Navigate to="/" />} />
           )}
+
+          <Route
+            path="/"
+            element={isAuthenticated ? <HomePage /> : <Navigate to="/welcome" />}
+          />
         </Routes>
       </div>
     </Router>
