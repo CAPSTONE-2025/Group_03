@@ -3,11 +3,13 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Routes, Link, Navigate } from 'react-router-dom';
 import HomePage from './pages/Home';
 import AboutPage from './pages/About';
-import TaskCalendar from './components/Calendar';
+//import TaskCalendar from './components/Calendar';
+import CalendarPage from './pages/Calendar';
 import BacklogPage from './pages/Backlog';
 import SignUp from './pages/Signup';
 import WelcomePage from './pages/WelcomePage'; 
 import Login from './pages/Login'; 
+import KanbanBoardPage from './pages/KanbanBoard';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
@@ -34,6 +36,9 @@ function App() {
                   <Link className="nav-link" to="/backlog">Backlog Board</Link>
                 </li>
                 <li className="nav-item">
+                  <Link className="nav-link" to="/kanbanboard">Kanban Board</Link>
+                </li>
+                <li className="nav-item">
                   <Link className="nav-link" to="/calendar">Calendar</Link>
                 </li>
               </ul>
@@ -52,8 +57,9 @@ function App() {
             <>
               <Route path="/home" element={<HomePage />} />
               <Route path="/about" element={<AboutPage />} />
-              <Route path="/calendar" element={<TaskCalendar />} />
+              <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/backlog" element={<BacklogPage />} />
+              <Route path="/kanbanboard" element={<KanbanBoardPage />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" />} />
