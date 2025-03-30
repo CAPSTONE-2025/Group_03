@@ -8,7 +8,7 @@
 | Name        |   Role |     Github    | Email       |
 | ----------- | --------- | --------- | --------------------------- |
 | Jimbert Manalo  | Back-End Dev | Jimbert12 | jmanalo11@myseneca.ca |
-| Seongjun Kim  | Front-End Dev |skim477 | skim477@myseneca.ca |
+| Seongjun Kim  | Full stack Dev |skim477 | skim477@myseneca.ca |
 | Gary Hu  | Front-End Dev | garyhch0702 | chu34@myseneca.ca |
 
 ## Project Description

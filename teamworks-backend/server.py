@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from model import calendar_collection , get_users_collection
+#from model import calendar_collection
+from model import get_users_collection
 
 import bcrypt
 from bson import ObjectId
@@ -15,6 +16,7 @@ CORS(app, origins=["http://localhost:3000"])
 def home():
     return jsonify({"message": "Welcome to Teamworks!"})
 
+"""
 @app.route('/calendar', methods=['POST'])
 def create_event():
     data = request.json
@@ -48,6 +50,7 @@ def delete_event(event_id):
         return jsonify({"error": "Event not found"}), 404
     return jsonify({"message": "Event deleted successfully"})
 
+"""
 
 # BackLog API
 
