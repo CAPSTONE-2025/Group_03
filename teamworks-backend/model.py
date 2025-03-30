@@ -18,7 +18,7 @@ else:
 
 # Select database
 db = client["teamworks_db"]
-calendar_collection = db["calendar_events"]
+#calendar_collection = db["calendar_events"]
 
 backlog_collection = db["backlog_items"]
 
