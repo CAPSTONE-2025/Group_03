@@ -10,11 +10,22 @@ function Backlog() {
     const [showForm, setShowForm] = useState(false);
     const [selectedTaskId, setSelectedTaskId] = useState(null);
     const [editingTask, setEditingTask] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(()=> {
-        axios.get(API_URL)
-        .then((response) => setTasks(response.data))
-        .catch((error) => console.error("Error fetching tasks:", error));
+        const fetchTasks = async () => {
+            try {
+                const response = await axios.get(API_URL);
+                setTasks(response.data);
+            } catch (error) {
+                console.error("Error fetching tasks:", error); 
+                setError(error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchTasks();
     }, []);
 
 
@@ -35,6 +46,7 @@ function Backlog() {
             setShowForm(false);
         } catch (error) {
             console.error("Error adding task:", error);
+            setError(error);
         }
     }
 
@@ -57,6 +69,7 @@ function Backlog() {
             setEditingTask(null);
         } catch (error) {
             console.error("Error updating task:", error);
+            setError(error);
         }
     };
 
@@ -87,19 +100,25 @@ function Backlog() {
             setSelectedTaskId(null);
         } catch (error) {
             console.error("Error deleting task:", error);
+            setError(error);
         }
     };
 
 
+    if (loading) return <div>Loading...</div>
+    if (error) return <div>Error fetching tasks: {error.message}</div>
+
   return (
     <div className="container mt-4 ">
         <div className="row">
-            <div className={(showForm || editingTask) ? "col-md-7" : "col-md-12"}>
-                <table class="table table-striped table-hover mx-auto ">
+
+            <div className={(showForm || editingTask) ? "col-lg-7 col-md-12" : "col-12"}>
+            <div className="table-responsive">
+                <table className="table table-striped table-hover mx-auto">
                     <thead>
                         <tr>
                             <th scope="col"></th>
-                            <th scope="col">ID</th>
+                            {/* <th scope="col">ID</th> */}
                             <th scope="col">Title</th>
                             <th scope="col">Label</th>
                             <th scope="col">Status</th>
@@ -121,7 +140,7 @@ function Backlog() {
                                         onChange={()=>handleSelectTask(task.id)}
                                     />
                                 </td>
-                                <td>{task.id}</td>
+                                {/* <td>{task.id}</td> */}
                                 <td >{task.title}</td>
                                 <td>{task.label}</td>
                                 <td>{task.status}</td>
@@ -132,10 +151,11 @@ function Backlog() {
                         )))}
                     </tbody>
                 </table>
+            </div>
                 <div className="d-flex justify-content-end m-2">
                     <button 
                         type="button" 
-                        class="btn btn-primary me-2" 
+                        className="btn btn-primary me-2" 
                         onClick={()=>{setShowForm(true); setEditingTask(null);}}
                     >
                         Add
@@ -151,23 +171,25 @@ function Backlog() {
             </div>
 
 
-            {showForm && (<div className="col-md-5">
-                <AddTaskForm onAdd={handleAddTask} onCancel={()=>setShowForm(false)} />
-            </div>)}
-
-            {editingTask && (
-                <div className="col-md-5">
-                    <EditTaskForm 
-                        task={editingTask} 
-                        onEdit={handleEditTask} 
-                        onCancel={() => setEditingTask(null)} 
-                    />
+            {(showForm || editingTask) && (
+                <div className="col-lg-5 col-md-12" style={{ maxHeight: "90vh", overflowY: "auto" }}>
+                    {showForm && (
+                        <AddTaskForm onAdd={handleAddTask} onCancel={() => setShowForm(false)} />
+                    )}
+                    {editingTask && (
+                        <EditTaskForm
+                            task={editingTask}
+                            onEdit={handleEditTask}
+                            onCancel={() => setEditingTask(null)}
+                        />
+                    )}
                 </div>
+  
             )}
-
         </div>
-    </div>
-  );
+    </div>  
+    
+    );
 }
 
 export default Backlog;
