@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import axios from "axios";
 import AddTaskForm from '../components/AddTaskForm';
+import TaskForm from '../components/TaskForm';
 import EditTaskForm from '../components/EditTaskForm';
-
 const API_URL = "http://localhost:5000/backlog";
 
 function Backlog() {
     const [tasks, setTasks] = useState([]);
     const [showForm, setShowForm] = useState(false);
+    const [showTaskForm, setShowTaskForm] = useState(false);
     const [selectedTaskId, setSelectedTaskId] = useState(null);
-    const [editingTask, setEditingTask] = useState(null);
+    const [selectedTask, setSelectedTask] = useState(null);
+    const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -40,7 +42,6 @@ function Backlog() {
                 ...newTask,
                 id: response.data.id,
             }
-
             //update the state with the new task
             setTasks([...tasks, createdTask]);
             setShowForm(false);
@@ -51,33 +52,35 @@ function Backlog() {
     }
 
     const handleRowClick = (task) => {
-        setEditingTask(task);
+        setSelectedTask(task);
         setShowForm(false);
+        setShowTaskForm(true);
+        setIsEditing(false);
+        setSelectedTaskId(null);
       };
-
-    
-    // UPDATE (PUT)
-    const handleEditTask = async (updatedTask) => {
-        try {
-            const response = await axios.put(`${API_URL}/${updatedTask.id}`, updatedTask);
-            console.log("Task updated:", response.data);
-
-            setTasks((prevTasks) => 
-                prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task))
-            );
-
-            setEditingTask(null);
-        } catch (error) {
-            console.error("Error updating task:", error);
-            setError(error);
-        }
-    };
 
 
     const handleSelectTask = (taskId) => {
         // If the user selects the same task again, we can unselect it. Otherwise, select the new task.
         setSelectedTaskId((prevId) => (prevId === taskId ? null : taskId));
       };
+
+
+    const handleEditTask = async (updatedTask) => {
+        try {
+          await axios.put(`${API_URL}/${updatedTask.id}`, updatedTask);
+          setTasks((prevTasks) =>
+            prevTasks.map((task) =>
+              task.id === updatedTask.id ? updatedTask : task
+            )
+          );
+          setSelectedTask(updatedTask); // update task shown
+          setIsEditing(false);          // return to view mode
+        } catch (error) {
+          console.error("Error updating task:", error);
+          setError(error);
+        }
+    };
 
 
     // DELETE (DELETE)
@@ -111,9 +114,8 @@ function Backlog() {
   return (
     <div className="container mt-4 ">
         <div className="row">
-
-            <div className={(showForm || editingTask) ? "col-lg-7 col-md-12" : "col-12"}>
-            <div className="table-responsive">
+            <div className={(showForm || showTaskForm) ? "col-lg-7 col-md-12" : "col-12"}>
+            <div className="table-responsive ">
                 <table className="table table-striped table-hover mx-auto">
                     <thead>
                         <tr>
@@ -156,7 +158,11 @@ function Backlog() {
                     <button 
                         type="button" 
                         className="btn btn-primary me-2" 
-                        onClick={()=>{setShowForm(true); setEditingTask(null);}}
+                        onClick={()=>{
+                            setShowForm(true);
+                            setShowTaskForm(false);
+                            setSelectedTask(null);
+                        }}
                     >
                         Add
                     </button>
@@ -171,17 +177,28 @@ function Backlog() {
             </div>
 
 
-            {(showForm || editingTask) && (
+            {(showForm || showTaskForm) && (
                 <div className="col-lg-5 col-md-12" style={{ maxHeight: "90vh", overflowY: "auto" }}>
                     {showForm && (
                         <AddTaskForm onAdd={handleAddTask} onCancel={() => setShowForm(false)} />
                     )}
-                    {editingTask && (
-                        <EditTaskForm
-                            task={editingTask}
-                            onEdit={handleEditTask}
-                            onCancel={() => setEditingTask(null)}
-                        />
+                    {showTaskForm && selectedTask && !isEditing && (
+                    <TaskForm
+                        task={selectedTask}
+                        onEdit={() => setIsEditing(true)}
+                        onClose={() => {
+                        setShowTaskForm(false);
+                        setSelectedTask(null);
+                        }}
+                    />
+                    )}
+
+                    {showTaskForm && selectedTask && isEditing && (
+                    <EditTaskForm
+                        task={selectedTask}
+                        onEdit={handleEditTask}
+                        onCancel={() => setIsEditing(false)}
+                    />
                     )}
                 </div>
   
