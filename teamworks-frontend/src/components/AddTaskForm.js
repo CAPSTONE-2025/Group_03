@@ -1,4 +1,5 @@
 import React, { useState} from 'react';
+import ReactMarkdown from 'react-markdown';
 
 function AddTaskForm({ onAdd, onCancel }) {
     const [newTask, setNewTask] = useState([
@@ -38,19 +39,23 @@ function AddTaskForm({ onAdd, onCancel }) {
             <h3>Add New Task</h3>
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                    <label for="title">Title</label>
+                    <label htmlFor="title">Title</label>
                     <input type="text" className="form-control" id="title" name="title" value={newTask.title} onChange={handleInputChange} required />
                 </div>
                 <div className="form-group">
-                    <label for="description">Description</label>
-                    <textarea type="text" rows="8" className="form-control" id="description" name="description" value={newTask.description} onChange={handleInputChange} required />
+                    <label htmlFor="description">Description</label>
+                    <textarea rows="8" className="form-control" id="description" name="description" value={newTask.description} onChange={handleInputChange} required />
+                    <div className="mt-2 p-2 border bg-light">
+                        <strong>Preview:</strong>
+                        <ReactMarkdown>{newTask.description}</ReactMarkdown>
+                    </div>
                 </div>
                 <div className="form-group">
-                    <label for="label">Label</label>
+                    <label htmlFor="label">Label</label>
                     <input type="text" className="form-control" id="label" name="label" value={newTask.label} onChange={handleInputChange} />
                 </div>
                 <div className="form-group">
-                    <label for="status">Status</label>
+                    <label htmlFor="status">Status</label>
                     <select className="form-control" id="status" name="status" value={newTask.status} onChange={handleInputChange} required>
                         <option value="">Select Status</option>
                         <option value="To Do">To Do</option>
@@ -59,7 +64,7 @@ function AddTaskForm({ onAdd, onCancel }) {
                     </select>
                 </div>
                 <div className="form-group">
-                    <label for="priority">Priority</label>
+                    <label htmlFor="priority">Priority</label>
                     <select className="form-control" id="priority" name="priority" value={newTask.priority} onChange={handleInputChange} required>
                         <option value="">Select Priority</option>
                         <option value="Low">Low</option>
@@ -68,11 +73,11 @@ function AddTaskForm({ onAdd, onCancel }) {
                     </select>  
                 </div>
                 <div className="form-group">
-                    <label for="assignedTo">Assigned To</label>
+                    <label htmlFor="assignedTo">Assigned To</label>
                     <input type="text" className="form-control" id="assignedTo" name="assignedTo" value={newTask.assignedTo} onChange={handleInputChange} required/>    
                 </div>
                 <div className="form-group">
-                    <label for="dueDate">Due Date</label>
+                    <label htmlFor="dueDate">Due Date</label>
                     <input type="date" className="form-control" id="dueDate" name="dueDate" value={newTask.dueDate} onChange={handleInputChange} required/>
                 </div>
                 <div className="d-flex justify-content-end mt-2">

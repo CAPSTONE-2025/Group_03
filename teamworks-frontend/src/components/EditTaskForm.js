@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 function EditTaskForm({ task, onEdit, onCancel }) {
   // Initialize local state with the task data
@@ -45,6 +46,10 @@ function EditTaskForm({ task, onEdit, onCancel }) {
             onChange={handleInputChange} 
             required 
           />
+          <div className="mt-2 p-2 border bg-light">
+            <strong>Preview:</strong>
+            <ReactMarkdown>{editedTask.description}</ReactMarkdown>
+          </div>
         </div>
         <div className="form-group">
           <label htmlFor="label">Label</label>
