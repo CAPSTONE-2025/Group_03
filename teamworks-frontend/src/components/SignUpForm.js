@@ -16,7 +16,7 @@ export default function SignUpForm() {
         try {
             console.log("Sending data to backend:", data); // Log the form data
             
-            const response = await fetch("http://127.0.0.1:5000/signup", {
+            const response = await fetch("http://127.0.0.1:5000/users", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
