@@ -28,11 +28,18 @@ function KanbanBoard() {
         { status: "Done", color: "#d4edda" },
     ];
 
-    const handleStatusChange = (id, newStatus) => {
-        const updatedTasks = tasks.map(task =>
-            task.id === id ? { ...task, status: newStatus } : task
-        );
-        setTasks(updatedTasks);
+    const handleStatusChange = async (taskId, newStatus) => {
+        try {
+            await axios.put(`http://localhost:5000/backlog/${taskId}`, { status: newStatus });
+
+            const updatedTasks = tasks.map(task =>
+                task.id === taskId ? { ...task, status: newStatus } : task
+            );
+            setTasks(updatedTasks);
+        } catch (error) {
+            console.error("Failed to update status:", error);
+            alert("Failed to update task status.");
+        }
     };
 
     if (loading) return <div>Loading...</div>;
@@ -54,13 +61,9 @@ function KanbanBoard() {
                             {tasks
                                 .filter((task) => task.status === column.status)
                                 .map((task) => (
-                                    <div
-                                        key={task.id}
-                                        className="card p-3 mb-3 shadow-sm"
-                                    >
+                                    <div key={task.id} className="card p-3 mb-3 shadow-sm">
                                         <h5>{task.title}</h5>
 
-                                        {/* Editable status dropdown */}
                                         <select
                                             className="form-select mb-2"
                                             value={task.status}
