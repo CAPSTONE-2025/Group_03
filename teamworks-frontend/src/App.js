@@ -10,6 +10,7 @@ import SignUp from './pages/Signup';
 import WelcomePage from './pages/WelcomePage'; 
 import Login from './pages/Login'; 
 import KanbanBoardPage from './pages/KanbanBoard';
+import ProfilePage from "./pages/Profile";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
@@ -43,6 +44,7 @@ function App() {
                 </li>
               </ul>
             </div>
+            <Link className="nav-link" to="/profile">Profile</Link>
           </div>
         </nav>
       )}
@@ -60,6 +62,7 @@ function App() {
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/backlog" element={<BacklogPage />} />
               <Route path="/kanbanboard" element={<KanbanBoardPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" />} />
