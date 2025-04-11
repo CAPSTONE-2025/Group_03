@@ -30,6 +30,7 @@ export default function LoginForm({ setIsAuthenticated }) {
             if (response.ok) {
                 setSubmitted(true);
                 setIsAuthenticated(true);  
+                localStorage.setItem("user", JSON.stringify(result.user));
                 navigate("/");  
             } else {
                 alert(result.error);
