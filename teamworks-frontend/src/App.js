@@ -16,6 +16,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
 
   return (
+    <div>
     <Router>
       {/* Navigation Bar - Only shown after authentication */}
       {isAuthenticated && (
@@ -75,6 +76,13 @@ function App() {
         </Routes>
       </div>
     </Router>
+
+    <footer className="footer bg-light text-center py-3 mt-4 fixed-bottom">
+          <small>
+            &copy; {new Date().getFullYear()} TeamWorks. Seongjun, Jimbert, Gary.
+          </small>
+    </footer>
+    </div>
   );
 }
 

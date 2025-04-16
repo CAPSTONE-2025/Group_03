@@ -36,7 +36,7 @@ function EditTaskForm({ task, onEdit, onCancel }) {
           />
         </div>
         <div className="form-group">
-          <label htmlFor="description">Description</label>
+          <label htmlFor="description">Description (supports Markdown syntax)</label>
           <textarea 
             rows="8"
             className="form-control" 

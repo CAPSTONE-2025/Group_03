@@ -43,7 +43,7 @@ function AddTaskForm({ onAdd, onCancel }) {
                     <input type="text" className="form-control" id="title" name="title" value={newTask.title} onChange={handleInputChange} required />
                 </div>
                 <div className="form-group">
-                    <label htmlFor="description">Description</label>
+                    <label htmlFor="description">Description (supports Markdown syntax)</label>
                     <textarea rows="8" className="form-control" id="description" name="description" value={newTask.description} onChange={handleInputChange} required />
                     <div className="mt-2 p-2 border bg-light">
                         <strong>Preview:</strong>
