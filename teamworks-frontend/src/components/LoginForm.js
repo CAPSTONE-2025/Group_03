@@ -17,8 +17,8 @@ export default function LoginForm({ setIsAuthenticated }) {
     const onSubmit = async (data) => {
         try {
             console.log("Sending login data to backend:", data);
-
-            const response = await fetch("http://127.0.0.1:5000/users/login", {
+            console.log("API:", process.env.REACT_APP_API_URL); // Log the API URL
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/login`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

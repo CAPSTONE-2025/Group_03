@@ -3,7 +3,7 @@ import axios from "axios";
 import AddTaskForm from '../components/AddTaskForm';
 import TaskForm from '../components/TaskForm';
 import EditTaskForm from '../components/EditTaskForm';
-const API_URL = "http://localhost:5000/backlog";
+const API_URL = `${process.env.REACT_APP_API_URL}/api/backlog`;
 
 function Backlog() {
     const [tasks, setTasks] = useState([]);

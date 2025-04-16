@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from "axios";
+const BACKLOG_URL = `${process.env.REACT_APP_API_URL}/api/backlog`;
 
 function KanbanBoard() {
     const [tasks, setTasks] = useState([]);
@@ -9,7 +10,7 @@ function KanbanBoard() {
     useEffect(() => {
         const fetchTasks = async () => {
             try {
-                const response = await axios.get("http://localhost:5000/backlog");
+                const response = await axios.get(BACKLOG_URL);
                 setTasks(response.data);
             } catch (error) {
                 console.error("Error fetching tasks:", error);
@@ -30,7 +31,7 @@ function KanbanBoard() {
 
     const handleStatusChange = async (taskId, newStatus) => {
         try {
-            await axios.put(`http://localhost:5000/backlog/${taskId}`, { status: newStatus });
+            await axios.put(`${BACKLOG_URL}/${taskId}`, { status: newStatus });
 
             const updatedTasks = tasks.map(task =>
                 task.id === taskId ? { ...task, status: newStatus } : task

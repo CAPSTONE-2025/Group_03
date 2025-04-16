@@ -16,7 +16,7 @@ def home():
     return jsonify({"message": "Welcome to Teamworks!"})
  
  
-@app.route('/backlog', methods=['GET'])
+@app.route('/api/backlog', methods=['GET'])
 def get_backlog():
     tasks= []
     for task in backlog_collection.find():
@@ -33,7 +33,7 @@ def get_backlog():
     return jsonify(tasks)
 
 
-@app.route('/backlog', methods=['POST'])
+@app.route('/api/backlog', methods=['POST'])
 def create_backlog():
     data = request.json
     required_fields = ["title", "description", "label", "status", "priority", "assignedTo", "dueDate"]
@@ -83,7 +83,7 @@ def create_backlog():
 #     return jsonify({"message": "Task updated successfully"})
 
 
-@app.route('/backlog/<task_id>', methods=['PUT'])
+@app.route('/api/backlog/<task_id>', methods=['PUT'])
 def update_task(task_id):
     data = request.json
     if not data:
@@ -114,14 +114,14 @@ def update_task(task_id):
     return jsonify({"message": "Task updated successfully"}), 200
 
 
-@app.route('/backlog/<task_id>', methods=['DELETE'])
+@app.route('/api/backlog/<task_id>', methods=['DELETE'])
 def delete_task(task_id):
     result = backlog_collection.delete_one({"_id": ObjectId(task_id)})
     if result.deleted_count == 0:
         return jsonify({"error": "Task not found"}), 404
     return jsonify({"message": "Task deleted successfully"})
 
-@app.route('/users', methods=['POST'])
+@app.route('/api/users', methods=['POST'])
 def create_user():
     data = request.json
     app.logger.info(f"Received signup data: {data}")
@@ -162,7 +162,7 @@ def create_user():
         return jsonify({"error": "An error occurred during signup."}), 500
 
 
-@app.route('/users/login', methods=['POST'])
+@app.route('/api/users/login', methods=['POST'])
 def login_user():
     data = request.json
     app.logger.info(f"Received login data: {data}")

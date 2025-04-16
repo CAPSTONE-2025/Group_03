@@ -4,10 +4,17 @@ function HomePage() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    fetch('http://localhost:5000/')
-      .then((response) => response.json())
-      .then((data) => setMessage(data.message))
-      .catch((error) => console.error('Error fetching data:', error));
+    const fetchHomeMessage = async () => {
+      try {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/`);
+        const data = await response.json();
+        setMessage(data.message);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    fetchHomeMessage();
   }, []);
 
   return (
