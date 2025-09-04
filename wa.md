@@ -7,6 +7,7 @@
 | Jimbert Manalo  | Back-End Dev | Jimbert12 | jmanalo11@myseneca.ca |
 | Seongjun Kim  | Front-End Dev |skim477 | skim477@myseneca.ca |
 | Gary Hu  | Front-End Dev | garyhch0702 | chu34@myseneca.ca |
+| Fawad Arshad  | Full stack Dev | Bagglebob | farshad2@myseneca.ca |
 
 ## Working Agreement
 
