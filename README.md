@@ -10,6 +10,7 @@
 | Jimbert Manalo  | Full stack Dev | Jimbert12 | jmanalo11@myseneca.ca |
 | Seongjun Kim  | Full stack Dev |skim477 | skim477@myseneca.ca |
 | Gary Hu  | Full stack Dev | garyhch0702 | chu34@myseneca.ca |
+| Fawad Arshad  | Full stack Dev | Bagglebob | farshad2@myseneca.ca |
 
 ## Project Description
 **TeamWorks** is an advanced project and workflow management system designed to help teams collaborate efficiently. It offers **real-time task updates**, **team role assignments**, and **progress tracking**, making it ideal for startups, corporate teams, and freelancers.
