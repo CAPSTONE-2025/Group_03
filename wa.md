@@ -32,7 +32,7 @@ This is a summary of guidelines for the project schedule.
 
 |     | Sprint 1        |   Sprint 2 |     Sprint 3    | Sprint 4       | Sprint 5 | Sprint 6 | Sprint 7 | Sprint 8|
 | ----| --------------- | ---------- | --------------- | -------------- | -------- | -------------- | -------------- |--------------|
-| Content  | README, dod, wa | tech stack: install and setup frontend, backend, batabase | Account management, Task management, calendar functionality | Kanban Board functionalities, prototype, MVP | additional functionalities in Task management | additional functionalities in Kanban Board   |  history fuctionality | deployment, Testing  |
+| Content  | README, dod, wa | tech stack: install and setup frontend, backend, batabase | Account management, Task management, calendar functionality | Kanban Board functionalities, view profile | additional functionalities in Task management | additional functionalities in Kanban Board   |  history fuctionality | deployment, Testing  |
 | Due Date  | Jan 31, 2025 | Feb 21, 2025 | March 21, 2025 | April 11, 2025  |  Sept, 2025 | Oct, 2025 | Nov, 2025 | Dec, 2025 |
 
 ---
