@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from "axios";
+import CommentSection from "../components/CommentSection";
+
 const BACKLOG_URL = `${process.env.REACT_APP_API_URL}/api/backlog`;
 
 function KanbanBoard() {
@@ -32,7 +34,6 @@ function KanbanBoard() {
     const handleStatusChange = async (taskId, newStatus) => {
         try {
             await axios.put(`${BACKLOG_URL}/${taskId}`, { status: newStatus });
-
             const updatedTasks = tasks.map(task =>
                 task.id === taskId ? { ...task, status: newStatus } : task
             );
@@ -62,7 +63,7 @@ function KanbanBoard() {
                             {tasks
                                 .filter((task) => task.status === column.status)
                                 .map((task) => (
-                                    <div key={task.id} className="card p-3 mb-3 shadow-sm">
+                                    <div key={task.id} className="card p-3 mb-4 shadow-sm">
                                         <h5>{task.title}</h5>
 
                                         <select
@@ -81,10 +82,13 @@ function KanbanBoard() {
                                             <span className="badge bg-primary">{task.label}</span>
                                             <span className="badge bg-info">{task.priority}</span>
                                         </div>
-                                        <div className="d-flex justify-content-between align-items-center">
+                                        <div className="d-flex justify-content-between align-items-center mb-2">
                                             <span className="badge bg-secondary">{task.dueDate}</span>
                                             <span className="badge bg-dark">{task.assignedTo}</span>
                                         </div>
+
+                                        {/* Comments */}
+                                        <CommentSection taskId={task.id} />
                                     </div>
                                 ))}
                         </div>

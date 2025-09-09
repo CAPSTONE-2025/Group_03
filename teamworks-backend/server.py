@@ -1,24 +1,24 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from model import get_users_collection
-
+from model import get_users_collection, get_comments_collection
+from model import backlog_collection
 import bcrypt
 from bson import ObjectId
-from model import backlog_collection
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
-
-CORS(app, origins=["http://localhost:3000"])
+CORS(app, origins=["http://localhost:3000"])  # CORS for frontend
 
 @app.route('/')
 def home():
     return jsonify({"message": "Welcome to Teamworks!"})
- 
- 
+
+# -------------------- BACKLOG ROUTES --------------------
+
 @app.route('/api/backlog', methods=['GET'])
 def get_backlog():
-    tasks= []
+    tasks = []
     for task in backlog_collection.find():
         tasks.append({
             "id": str(task["_id"]),
@@ -31,7 +31,6 @@ def get_backlog():
             "dueDate": task["dueDate"]
         })
     return jsonify(tasks)
-
 
 @app.route('/api/backlog', methods=['POST'])
 def create_backlog():
@@ -53,7 +52,7 @@ def create_backlog():
     result = backlog_collection.insert_one(task)
     return jsonify({"message": "Task created", "id": str(result.inserted_id)}), 201
 
-
+# ORIGINAL GREEN BLOCK (Do not remove or modify)
 # @app.route('/backlog/<task_id>', methods=['PUT'])
 # def update_task(task_id):
 #     data = request.json
@@ -81,7 +80,6 @@ def create_backlog():
 #     if result.modified_count == 0:
 #         return jsonify({"error": "Task not updated"}), 400
 #     return jsonify({"message": "Task updated successfully"})
-
 
 @app.route('/api/backlog/<task_id>', methods=['PUT'])
 def update_task(task_id):
@@ -113,7 +111,6 @@ def update_task(task_id):
 
     return jsonify({"message": "Task updated successfully"}), 200
 
-
 @app.route('/api/backlog/<task_id>', methods=['DELETE'])
 def delete_task(task_id):
     result = backlog_collection.delete_one({"_id": ObjectId(task_id)})
@@ -121,32 +118,27 @@ def delete_task(task_id):
         return jsonify({"error": "Task not found"}), 404
     return jsonify({"message": "Task deleted successfully"})
 
+# -------------------- USER AUTH ROUTES --------------------
+
 @app.route('/api/users', methods=['POST'])
 def create_user():
     data = request.json
     app.logger.info(f"Received signup data: {data}")
 
-    # Check if the required fields are provided
     if not data.get('firstName') or not data.get('lastName') or not data.get('email') or not data.get('password'):
         app.logger.error("Missing required fields.")
         return jsonify({"error": "All fields are required"}), 400
 
     try:
         users_collection = get_users_collection()
-
-        # Check if a user with the given email already exists
         existing_user = users_collection.find_one({"email": data['email']})
         if existing_user:
             app.logger.warning("Attempt to create an account with an existing email.")
             return jsonify({"error": "An account with this email already exists."}), 409
         
-        # Hash the password
         hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
-
-        # Log the collection info to ensure it works
         app.logger.info(f"Using collection: {str(get_users_collection())}")
 
-        # Store the user in MongoDB
         user = {
             "firstName": data["firstName"],
             "lastName": data["lastName"],
@@ -160,7 +152,6 @@ def create_user():
     except Exception as e:
         app.logger.error(f"Error during signup: {e}")
         return jsonify({"error": "An error occurred during signup."}), 500
-
 
 @app.route('/api/users/login', methods=['POST'])
 def login_user():
@@ -186,7 +177,36 @@ def login_user():
         app.logger.error(f"Error during login: {e}")
         return jsonify({"error": "An error occurred during login."}), 500
 
+# -------------------- COMMENT ROUTES --------------------
 
-    
+@app.route('/api/comments/<task_id>', methods=['GET'])
+def get_comments(task_id):
+    comments = []
+    for comment in get_comments_collection().find({"taskId": task_id}):
+        comments.append({
+            "id": str(comment["_id"]),
+            "taskId": comment["taskId"],
+            "author": comment["author"],
+            "text": comment["text"],
+            "timestamp": comment["timestamp"]
+        })
+    return jsonify(comments)
+
+@app.route('/api/comments/<task_id>', methods=['POST'])
+def post_comment(task_id):
+    data = request.json
+    if not data.get("author") or not data.get("text"):
+        return jsonify({"error": "Missing author or text"}), 400
+
+    comment = {
+        "taskId": task_id,
+        "author": data["author"],
+        "text": data["text"],
+        "timestamp": data.get("timestamp", datetime.utcnow().isoformat())
+    }
+    result = get_comments_collection().insert_one(comment)
+    return jsonify({"message": "Comment added", "id": str(result.inserted_id)}), 201
+
+# -------------------- SERVER RUN --------------------
 if __name__ == "__main__":
     app.run(debug=True)
