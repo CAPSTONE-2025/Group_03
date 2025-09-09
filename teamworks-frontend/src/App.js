@@ -11,9 +11,57 @@ import WelcomePage from './pages/WelcomePage';
 import Login from './pages/Login'; 
 import KanbanBoardPage from './pages/KanbanBoard';
 import ProfilePage from "./pages/Profile";
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+
+  // Check authentication state on component mount
+  React.useEffect(() => {
+    const checkAuth = () => {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          if (user && user.id) {
+            setIsAuthenticated(true);
+          } else {
+            localStorage.removeItem("user");
+            setIsAuthenticated(false);
+          }
+        } catch (error) {
+          console.error("Error parsing user data:", error);
+          localStorage.removeItem("user");
+          setIsAuthenticated(false);
+        }
+      } else {
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkAuth();
+
+    // Listen for storage changes (when user logs in/out in another tab)
+    const handleStorageChange = (e) => {
+      if (e.key === "user") {
+        checkAuth();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem("user"); // Clear user data from localStorage
+    // Redirect to welcome page
+    window.location.href = '/welcome';
+  };
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+  };
 
   return (
     <Router>
@@ -44,7 +92,19 @@ function App() {
                 </li>
               </ul>
             </div>
-            <Link className="nav-link" to="/profile">Profile</Link>
+            <div className="d-flex align-items-center">
+              <Link className="nav-link me-3" to="/profile" title="Profile">
+                <i className="bi bi-person fs-5"></i>
+              </Link>
+              <button 
+                className="btn btn-link nav-link p-0" 
+                onClick={handleLogout}
+                title="Logout"
+                style={{ border: 'none', background: 'none' }}
+              >
+                <i className="bi bi-box-arrow-right fs-5"></i>
+              </button>
+            </div>
           </div>
         </nav>
       )}
@@ -53,8 +113,8 @@ function App() {
       <div className="container mt-4">
         <Routes>
           <Route path="/welcome" element={<WelcomePage setIsAuthenticated={setIsAuthenticated} />} />
-          <Route path="/signup" element={<SignUp setIsAuthenticated={setIsAuthenticated} />} />
-          <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
+          <Route path="/signup" element={<SignUp setIsAuthenticated={handleLogin} />} />
+          <Route path="/login" element={<Login setIsAuthenticated={handleLogin} />} />
           {isAuthenticated ? (
             <>
               <Route path="/home" element={<HomePage />} />

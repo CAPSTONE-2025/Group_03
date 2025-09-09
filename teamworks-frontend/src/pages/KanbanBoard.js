@@ -9,7 +9,7 @@ function KanbanBoard() {
     useEffect(() => {
         const fetchTasks = async () => {
             try {
-                const response = await axios.get("http://localhost:5000/backlog");
+                const response = await axios.get("http://localhost:5001/backlog");
                 setTasks(response.data);
             } catch (error) {
                 console.error("Error fetching tasks:", error);
@@ -30,7 +30,7 @@ function KanbanBoard() {
 
     const handleStatusChange = async (taskId, newStatus) => {
         try {
-            await axios.put(`http://localhost:5000/backlog/${taskId}`, { status: newStatus });
+            await axios.put(`http://localhost:5001/backlog/${taskId}`, { status: newStatus });
 
             const updatedTasks = tasks.map(task =>
                 task.id === taskId ? { ...task, status: newStatus } : task
