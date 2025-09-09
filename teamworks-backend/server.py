@@ -16,7 +16,7 @@ def home():
     return jsonify({"message": "Welcome to Teamworks!"})
  
  
-@app.route('/backlog', methods=['GET'])
+@app.route('/api/backlog', methods=['GET'])
 def get_backlog():
     tasks= []
     for task in backlog_collection.find():
@@ -33,7 +33,7 @@ def get_backlog():
     return jsonify(tasks)
 
 
-@app.route('/backlog', methods=['POST'])
+@app.route('/api/backlog', methods=['POST'])
 def create_backlog():
     data = request.json
     required_fields = ["title", "description", "label", "status", "priority", "assignedTo", "dueDate"]
@@ -54,43 +54,74 @@ def create_backlog():
     return jsonify({"message": "Task created", "id": str(result.inserted_id)}), 201
 
 
-@app.route('/backlog/<task_id>', methods=['PUT'])
+# @app.route('/backlog/<task_id>', methods=['PUT'])
+# def update_task(task_id):
+#     data = request.json
+#     task = backlog_collection.find_one({"_id": ObjectId(task_id)})
+#     if not task:
+#         return jsonify({"error": "Task not found"}), 404
+
+#     update = {}
+#     if data.get("title"):
+#         update["title"] = data["title"]
+#     if data.get("description"):
+#         update["description"] = data["description"]
+#     if data.get("label"):
+#         update["label"] = data["label"]
+#     if data.get("status"):
+#         update["status"] = data["status"]
+#     if data.get("priority"):
+#         update["priority"] = data["priority"]
+#     if data.get("assignedTo"):
+#         update["assignedTo"] = data["assignedTo"]
+#     if data.get("dueDate"):
+#         update["dueDate"] = data["dueDate"]
+
+#     result = backlog_collection.update_one({"_id": ObjectId(task_id)}, {"$set": update})
+#     if result.modified_count == 0:
+#         return jsonify({"error": "Task not updated"}), 400
+#     return jsonify({"message": "Task updated successfully"})
+
+
+@app.route('/api/backlog/<task_id>', methods=['PUT'])
 def update_task(task_id):
     data = request.json
+    if not data:
+        return jsonify({"error": "Missing JSON payload"}), 400
+
     task = backlog_collection.find_one({"_id": ObjectId(task_id)})
     if not task:
         return jsonify({"error": "Task not found"}), 404
 
+    allowed_fields = ["title", "description", "label", "status", "priority", "assignedTo", "dueDate"]
     update = {}
-    if data.get("title"):
-        update["title"] = data["title"]
-    if data.get("description"):
-        update["description"] = data["description"]
-    if data.get("label"):
-        update["label"] = data["label"]
-    if data.get("status"):
-        update["status"] = data["status"]
-    if data.get("priority"):
-        update["priority"] = data["priority"]
-    if data.get("assignedTo"):
-        update["assignedTo"] = data["assignedTo"]
-    if data.get("dueDate"):
-        update["dueDate"] = data["dueDate"]
 
-    result = backlog_collection.update_one({"_id": ObjectId(task_id)}, {"$set": update})
+    for field in allowed_fields:
+        if field in data:
+            update[field] = data[field]
+
+    if not update:
+        return jsonify({"error": "No valid fields to update"}), 400
+
+    result = backlog_collection.update_one(
+        {"_id": ObjectId(task_id)},
+        {"$set": update}
+    )
+
     if result.modified_count == 0:
-        return jsonify({"error": "Task not updated"}), 400
-    return jsonify({"message": "Task updated successfully"})
+        return jsonify({"message": "No changes were made"}), 200
+
+    return jsonify({"message": "Task updated successfully"}), 200
 
 
-@app.route('/backlog/<task_id>', methods=['DELETE'])
+@app.route('/api/backlog/<task_id>', methods=['DELETE'])
 def delete_task(task_id):
     result = backlog_collection.delete_one({"_id": ObjectId(task_id)})
     if result.deleted_count == 0:
         return jsonify({"error": "Task not found"}), 404
     return jsonify({"message": "Task deleted successfully"})
 
-@app.route('/users', methods=['POST'])
+@app.route('/api/users', methods=['POST'])
 def create_user():
     data = request.json
     app.logger.info(f"Received signup data: {data}")
@@ -131,7 +162,7 @@ def create_user():
         return jsonify({"error": "An error occurred during signup."}), 500
 
 
-@app.route('/users/login', methods=['POST'])
+@app.route('/api/users/login', methods=['POST'])
 def login_user():
     data = request.json
     app.logger.info(f"Received login data: {data}")
