@@ -2,22 +2,20 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import logo from '../assets/logo.png'; // Adjust the path as needed
 
-const WelcomePage = ({ setIsAuthenticated }) => {
+const WelcomePage = () => {
     return (
         <>
-            <nav className="navbar navbar-expand-lg navbar-light  rounded"> {/* Added rounded class */}
+        
+            <nav className="navbar navbar-expand-lg navbar-light rounded"> {/* Added rounded class */}
                 <div className="container-fluid"> {/* Added container-fluid for better spacing */}
                     <Link className="navbar-brand" to="/">
-                        <img src={logo} width="180px" height="65px" className="d-inline-block align-top" alt="Logo" />
+                        <img
+                            src={logo}
+                            className="d-inline-block align-top img-fluid"
+                            style={{ maxWidth: "160px",  }}
+                            alt="Logo"
+                        />
                     </Link>
-                    <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                        <span className="navbar-toggler-icon"></span>
-                    </button>
-                    <div className="collapse navbar-collapse" id="navbarNav">
-                        <ul className="navbar-nav">
-                            {/* Add navigation links here if needed */}
-                        </ul>
-                    </div>
                 </div>
             </nav>
 

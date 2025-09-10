@@ -10,7 +10,7 @@ export default function LoginForm({ setIsAuthenticated }) {
         formState: { errors },
     } = useForm();
 
-    const [submitted, setSubmitted] = useState(false);
+
     const [showPassword, setShowPassword] = useState(false);
     const navigate = useNavigate();  // Hook for navigation
 
@@ -28,7 +28,6 @@ export default function LoginForm({ setIsAuthenticated }) {
 
             const result = await response.json();
             if (response.ok) {
-                setSubmitted(true);
                 setIsAuthenticated(true);  
                 localStorage.setItem("user", JSON.stringify(result.user));
                 navigate("/");  
@@ -45,67 +44,62 @@ export default function LoginForm({ setIsAuthenticated }) {
     };
 
     return (
-        <div className="container-fluid d-flex align-items-center justify-content-center" style={{ minHeight: "100vh" }}>
-            <div className="border p-4 rounded w-75 shadow-lg">
-                <div className="row w-100">
+<div className="container my-5">
+    <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
+        <div className="col-lg-8 col-md-10">
+            <div className="border p-4 rounded shadow-lg">
+                <div className="row">
                     <div className="col-md-6 p-5">
-                        <div className="card mx-auto" style={{ maxWidth: "400px" }}>
-                            <div className="card-body">
-                                <h2 className="card-title text-center mb-4">Login</h2>
-                                {submitted ? (
-                                    <p className="text-success text-center">Login successful! Redirecting...</p>
-                                ) : (
-                                    <form onSubmit={handleSubmit(onSubmit)} className="mb-3">
-                                        <div className="mb-3">
-                                            <label htmlFor="email" className="form-label">Email</label>
-                                            <input
-                                                type="email"
-                                                className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                                                id="email"
-                                                {...register("email", { required: "Email is required" })}
-                                            />
-                                            {errors.email && <div className="invalid-feedback">{errors.email.message}</div>}
-                                        </div>
-
-                                        <div className="mb-3">
-                                            <label htmlFor="password" className="form-label">Password</label>
-                                            <input
-                                                type={showPassword ? "text" : "password"}
-                                                className={`form-control ${errors.password ? 'is-invalid' : ''}`}
-                                                id="password"
-                                                {...register("password", { required: "Password is required" })}
-                                            />
-                                            {errors.password && <div className="invalid-feedback">{errors.password.message}</div>}
-                                        </div>
-
-                                        <div className="form-check mb-3">
-                                            <input
-                                                className="form-check-input"
-                                                type="checkbox"
-                                                id="showPassword"
-                                                onChange={togglePasswordVisibility}
-                                            />
-                                            <label className="form-check-label" htmlFor="showPassword">
-                                                Show Password
-                                            </label>
-                                        </div>
-
-                                        <button type="submit" className="btn btn-primary w-100">Login</button>
-                                    </form>
-                                )}
-                                <p className="mt-3 text-center">
-                                    Don't have an account? {" "}
-                                    <a href="/signup" className="link link-primary">Sign Up</a>
-                                </p>
+                        <h2 className="text-center mb-4">Login</h2>
+                        <form onSubmit={handleSubmit(onSubmit)}>
+                            <div className="mb-3">
+                                <label htmlFor="email" className="form-label">Email</label>
+                                <input
+                                    type="email"
+                                    className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                                    id="email"
+                                    {...register("email", { required: "Email is required" })}
+                                />
+                                {errors.email && <div className="invalid-feedback">{errors.email.message}</div>}
                             </div>
-                        </div>
+
+                            <div className="mb-3">
+                                <label htmlFor="password" className="form-label">Password</label>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    className={`form-control ${errors.password ? 'is-invalid' : ''}`}
+                                    id="password"
+                                    {...register("password", { required: "Password is required" })}
+                                />
+                                {errors.password && <div className="invalid-feedback">{errors.password.message}</div>}
+                            </div>
+
+                            <div className="form-check mb-3">
+                                <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id="showPassword"
+                                    onChange={togglePasswordVisibility}
+                                />
+                                <label className="form-check-label" htmlFor="showPassword">
+                                    Show Password
+                                </label>
+                            </div>
+
+                            <button type="submit" className="btn btn-primary w-100">Login</button>
+                        </form>
+                        <p className="mt-3 text-center">
+                            Don't have an account? <a href="/signup" className="link link-primary">Sign Up</a>
+                        </p>
                     </div>
-                    
-                    <div className="col-md-6 p-0">
-                        <img src={loginImg} alt="Login" className="signup-img" />
+
+                    <div className="col-md-6 p-0 d-none d-md-block">
+                        <img src={loginImg} alt="Login" className="w-100 h-100 object-fit-cover rounded-end" />
                     </div>
                 </div>
             </div>
         </div>
+    </div>
+</div>
     );
 }
