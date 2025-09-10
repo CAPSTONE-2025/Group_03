@@ -169,7 +169,8 @@ def login_user():
                 "id": str(user['_id']),
                 "firstName": user['firstName'],
                 "lastName": user['lastName'],
-                "email": user['email']
+                "email": user['email'],
+                "bio": user.get('bio', '')
             }}), 200
         else:
             return jsonify({"error": "Invalid email or password"}), 401
@@ -207,6 +208,67 @@ def post_comment(task_id):
     result = get_comments_collection().insert_one(comment)
     return jsonify({"message": "Comment added", "id": str(result.inserted_id)}), 201
 
+# -------------------- PROFILE ROUTES --------------------
+
+@app.route('/users/<user_id>', methods=['PUT'])
+def update_user_profile(user_id):
+    data = request.json
+    app.logger.info(f"Received profile update data for user {user_id}: {data}")
+
+    # Check if the required fields are provided
+    if not data.get('firstName') or not data.get('lastName') or not data.get('email'):
+        app.logger.error("Missing required fields.")
+        return jsonify({"error": "First name, last name, and email are required"}), 400
+
+    try:
+        users_collection = get_users_collection()
+        
+        # Check if user exists
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            app.logger.error(f"User with ID {user_id} not found.")
+            return jsonify({"error": "User not found"}), 404
+
+        # Check if email is being changed and if the new email already exists
+        if data['email'] != user['email']:
+            existing_user = users_collection.find_one({"email": data['email']})
+            if existing_user:
+                app.logger.warning("Attempt to update email to an existing email.")
+                return jsonify({"error": "An account with this email already exists."}), 409
+
+        # Update the user profile
+        update_data = {
+            "firstName": data["firstName"],
+            "lastName": data["lastName"],
+            "email": data["email"]
+        }
+        
+        # Add bio if provided
+        if data.get("bio"):
+            update_data["bio"] = data["bio"]
+
+        result = users_collection.update_one(
+            {"_id": ObjectId(user_id)}, 
+            {"$set": update_data}
+        )
+        
+        if result.modified_count == 0:
+            app.logger.warning("No changes were made to the user profile.")
+            return jsonify({"error": "No changes were made"}), 400
+
+        app.logger.info(f"User profile updated successfully for user {user_id}")
+        return jsonify({"message": "Profile updated successfully", "user": {
+            "id": user_id,
+            "firstName": data["firstName"],
+            "lastName": data["lastName"],
+            "email": data["email"],
+            "bio": data.get("bio", "")
+        }}), 200
+
+    except Exception as e:
+        app.logger.error(f"Error during profile update: {e}")
+        return jsonify({"error": "An error occurred during profile update."}), 500
+
 # -------------------- SERVER RUN --------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=5001)

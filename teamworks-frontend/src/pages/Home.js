@@ -6,7 +6,7 @@ function HomePage() {
   useEffect(() => {
     const fetchHomeMessage = async () => {
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/`);
+        const response = await fetch('http://localhost:5001/');
         const data = await response.json();
         setMessage(data.message);
       } catch (error) {

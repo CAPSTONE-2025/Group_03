@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from "axios";
 import CommentSection from "../components/CommentSection";
 
-const BACKLOG_URL = `${process.env.REACT_APP_API_URL}/api/backlog`;
+const BACKLOG_URL = "http://localhost:5001/backlog";
 
 function KanbanBoard() {
     const [tasks, setTasks] = useState([]);
