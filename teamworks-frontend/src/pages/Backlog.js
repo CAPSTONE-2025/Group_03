@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import axios from "axios";
 import AddTaskForm from '../components/AddTaskForm';
 import TaskForm from '../components/TaskForm';
 import EditTaskForm from '../components/EditTaskForm';
+import { AuthContext } from '../contexts/AuthContext';  
+
 const API_URL = `${process.env.REACT_APP_API_URL}/api/backlog`;
 
 function Backlog() {
+    const { user } = useContext(AuthContext);  // ✅ FIX: moved before using user
+    console.log(user.fullName);
+
     const [tasks, setTasks] = useState([]);
     const [showForm, setShowForm] = useState(false);
     const [showTaskForm, setShowTaskForm] = useState(false);
@@ -15,197 +20,199 @@ function Backlog() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    useEffect(()=> {
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState("");
+
+    useEffect(() => {
         const fetchTasks = async () => {
             try {
                 const response = await axios.get(API_URL);
                 setTasks(response.data);
             } catch (error) {
-                console.error("Error fetching tasks:", error); 
                 setError(error);
             } finally {
                 setLoading(false);
             }
-        }
+        };
         fetchTasks();
     }, []);
 
-
-    // CREATE (POST)
     const handleAddTask = async (newTask) => {
         try {
             const response = await axios.post(API_URL, newTask);
-            newTask.id = response.data.id;
-
-            // Construct the new task with the actual Id from the DB
-            const createdTask = {
-                ...newTask,
-                id: response.data.id,
-            }
-            //update the state with the new task
-            setTasks([...tasks, createdTask]);
+            setTasks([...tasks, { ...newTask, id: response.data.id }]);
             setShowForm(false);
         } catch (error) {
-            console.error("Error adding task:", error);
             setError(error);
         }
-    }
+    };
 
-    const handleRowClick = (task) => {
+    const handleRowClick = async (task) => {
         setSelectedTask(task);
         setShowForm(false);
         setShowTaskForm(true);
         setIsEditing(false);
         setSelectedTaskId(null);
-      };
 
-
-    const handleSelectTask = (taskId) => {
-        // If the user selects the same task again, we can unselect it. Otherwise, select the new task.
-        setSelectedTaskId((prevId) => (prevId === taskId ? null : taskId));
-      };
-
-
-    const handleEditTask = async (updatedTask) => {
         try {
-          await axios.put(`${API_URL}/${updatedTask.id}`, updatedTask);
-          setTasks((prevTasks) =>
-            prevTasks.map((task) =>
-              task.id === updatedTask.id ? updatedTask : task
-            )
-          );
-          setSelectedTask(updatedTask); // update task shown
-          setIsEditing(false);          // return to view mode
+            const response = await axios.get(`${API_URL}/${task.id}/comments`);
+            setComments(response.data);
         } catch (error) {
-          console.error("Error updating task:", error);
-          setError(error);
+            console.error("Error fetching comments:", error);
         }
     };
 
+    const handleSelectTask = (taskId) => {
+        setSelectedTaskId(prevId => (prevId === taskId ? null : taskId));
+    };
 
-    // DELETE (DELETE)
-    const handleDeleteTask = async () => {
-        if (!selectedTaskId) {
-            alert("Please select a task to delete.");
-        return;
-        }
-
+    const handleEditTask = async (updatedTask) => {
         try {
-            const response = await axios.delete(`${API_URL}/${selectedTaskId}`);
-            console.log("Task deleted:", response.data);
-
-            // Remove the task from local state
-            setTasks((prevTasks) => 
-                prevTasks.filter((task) => task.id !== selectedTaskId)
-            );
-
-            // Clear the selection
-            setSelectedTaskId(null);
+            await axios.put(`${API_URL}/${updatedTask.id}`, updatedTask);
+            setTasks(tasks.map(task => task.id === updatedTask.id ? updatedTask : task));
+            setSelectedTask(updatedTask);
+            setIsEditing(false);
         } catch (error) {
-            console.error("Error deleting task:", error);
             setError(error);
         }
     };
 
+    const handleDeleteTask = async () => {
+        if (!selectedTaskId) return alert("Select a task to delete.");
 
-    if (loading) return <div>Loading...</div>
-    if (error) return <div>Error fetching tasks: {error.message}</div>
+        try {
+            await axios.delete(`${API_URL}/${selectedTaskId}`);
+            setTasks(tasks.filter(task => task.id !== selectedTaskId));
+            setSelectedTaskId(null);
+        } catch (error) {
+            setError(error);
+        }
+    };
 
-  return (
-    <div className="container mt-4 ">
-        <div className="row">
-            <div className={(showForm || showTaskForm) ? "col-lg-7 col-md-12" : "col-12"}>
-            <div className="table-responsive ">
-                <table className="table table-striped table-hover mx-auto">
-                    <thead>
-                        <tr>
-                            <th scope="col"></th>
-                            {/* <th scope="col">ID</th> */}
-                            <th scope="col">Title</th>
-                            <th scope="col">Label</th>
-                            <th scope="col">Status</th>
-                            <th scope="col">Priority</th>
-                            <th scope="col">Assigned To</th>
-                            <th scope="col">Due Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {tasks.map((task=> (
-                            <tr key={task.id}
-                            onClick={() => handleRowClick(task)} 
-                            style={{ cursor: 'pointer' }}
-                            >
-                                <td>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={selectedTaskId === task.id} 
-                                        onChange={()=>handleSelectTask(task.id)}
-                                    />
-                                </td>
-                                {/* <td>{task.id}</td> */}
-                                <td >{task.title}</td>
-                                <td>{task.label}</td>
-                                <td>{task.status}</td>
-                                <td>{task.priority}</td>
-                                <td>{task.assignedTo}</td>
-                                <td>{task.dueDate}</td>
+   const handleAddComment = async () => {
+  if (!newComment.trim()) return;
+
+  try {
+    const response = await axios.post(`${API_URL}/${selectedTask.id}/comments`, {
+      text: newComment,
+      author: user.fullName || "Anonymous",
+    });
+
+    console.log("Comment response:", response.data); 
+
+    setComments([...comments, response.data]); 
+    setNewComment("");
+  } catch (error) {
+    console.error("Error adding comment:", error.response?.data || error.message); 
+    alert("Failed to add comment.");
+  }
+};
+
+
+    if (loading) return <div>Loading...</div>;
+    if (error) return <div>Error: {error.message}</div>;
+
+    return (
+        <div className="container mt-4">
+            <div className="row">
+                <div className={(showForm || showTaskForm) ? "col-lg-7 col-md-12" : "col-12"}>
+                    <table className="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Title</th>
+                                <th>Label</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Assigned To</th>
+                                <th>Due Date</th>
                             </tr>
-                        )))}
-                    </tbody>
-                </table>
-            </div>
-                <div className="d-flex justify-content-end m-2">
-                    <button 
-                        type="button" 
-                        className="btn btn-primary me-2" 
-                        onClick={()=>{
+                        </thead>
+                        <tbody>
+                            {tasks.map(task => (
+                                <tr key={task.id} onClick={() => handleRowClick(task)} style={{ cursor: 'pointer' }}>
+                                    <td>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedTaskId === task.id}
+                                            onChange={() => handleSelectTask(task.id)}
+                                        />
+                                    </td>
+                                    <td>{task.title}</td>
+                                    <td>{task.label}</td>
+                                    <td>{task.status}</td>
+                                    <td>{task.priority}</td>
+                                    <td>{task.assignedTo}</td>
+                                    <td>{task.dueDate}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    <div className="d-flex justify-content-end">
+                        <button className="btn btn-primary me-2" onClick={() => {
                             setShowForm(true);
                             setShowTaskForm(false);
                             setSelectedTask(null);
-                        }}
-                    >
-                        Add
-                    </button>
-                    <button 
-                        type="button" 
-                        className="btn btn-secondary"
-                        onClick={handleDeleteTask}
-                    >
-                        Delete
-                    </button>
+                        }}>
+                            Add
+                        </button>
+                        <button className="btn btn-danger" onClick={handleDeleteTask}>
+                            Delete
+                        </button>
+                    </div>
                 </div>
+
+                {(showForm || showTaskForm) && (
+                    <div className="col-lg-5 col-md-12" style={{ maxHeight: "90vh", overflowY: "auto" }}>
+                        {showForm && (
+                            <AddTaskForm onAdd={handleAddTask} onCancel={() => setShowForm(false)} />
+                        )}
+                        {showTaskForm && selectedTask && !isEditing && (
+                            <>
+                                <TaskForm
+                                    task={selectedTask}
+                                    onEdit={() => setIsEditing(true)}
+                                    onClose={() => {
+                                        setShowTaskForm(false);
+                                        setSelectedTask(null);
+                                    }}
+                                />
+                                <div className="mt-4">
+                                    <h5>Comments</h5>
+                                    {comments.length === 0 && <p>No comments yet.</p>}
+                                    <ul className="list-group mb-3">
+                                        {comments.map((comment, idx) => (
+                                            <li key={idx} className="list-group-item">
+                                                <strong>{comment.author}:</strong> {comment.text}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <div className="input-group">
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            placeholder="Write a comment..."
+                                            value={newComment}
+                                            onChange={(e) => setNewComment(e.target.value)}
+                                        />
+                                        <button className="btn btn-primary" onClick={handleAddComment}>
+                                            Add Comment
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                        {showTaskForm && selectedTask && isEditing && (
+                            <EditTaskForm
+                                task={selectedTask}
+                                onEdit={handleEditTask}
+                                onCancel={() => setIsEditing(false)}
+                            />
+                        )}
+                    </div>
+                )}
             </div>
-
-
-            {(showForm || showTaskForm) && (
-                <div className="col-lg-5 col-md-12" style={{ maxHeight: "90vh", overflowY: "auto" }}>
-                    {showForm && (
-                        <AddTaskForm onAdd={handleAddTask} onCancel={() => setShowForm(false)} />
-                    )}
-                    {showTaskForm && selectedTask && !isEditing && (
-                    <TaskForm
-                        task={selectedTask}
-                        onEdit={() => setIsEditing(true)}
-                        onClose={() => {
-                        setShowTaskForm(false);
-                        setSelectedTask(null);
-                        }}
-                    />
-                    )}
-
-                    {showTaskForm && selectedTask && isEditing && (
-                    <EditTaskForm
-                        task={selectedTask}
-                        onEdit={handleEditTask}
-                        onCancel={() => setIsEditing(false)}
-                    />
-                    )}
-                </div>
-  
-            )}
         </div>
-    </div>  
-    
     );
 }
 

@@ -192,20 +192,31 @@ def get_comments(task_id):
         })
     return jsonify(comments)
 
-@app.route('/api/comments/<task_id>', methods=['POST'])
-def post_comment(task_id):
+@app.route("/api/backlog/<task_id>/comments", methods=["POST"])
+def add_comment(task_id):
     data = request.json
-    if not data.get("author") or not data.get("text"):
-        return jsonify({"error": "Missing author or text"}), 400
+    author = data.get("author", "Anonymous")
+    text = data.get("text")
 
+    if not text:
+        return jsonify({"error": "Comment text is required"}), 400
+
+    # Check if the task exists in the backlog_collection
+    task = backlog_collection.find_one({"_id": ObjectId(task_id)})
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+
+    # Insert comment into the comments collection
     comment = {
         "taskId": task_id,
-        "author": data["author"],
-        "text": data["text"],
-        "timestamp": data.get("timestamp", datetime.utcnow().isoformat())
+        "author": author,
+        "text": text,
+        "timestamp": datetime.utcnow()
     }
     result = get_comments_collection().insert_one(comment)
-    return jsonify({"message": "Comment added", "id": str(result.inserted_id)}), 201
+    comment["_id"] = str(result.inserted_id)
+
+    return jsonify(comment), 201
 
 # -------------------- SERVER RUN --------------------
 if __name__ == "__main__":
