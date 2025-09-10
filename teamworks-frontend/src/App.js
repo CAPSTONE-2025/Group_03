@@ -1,5 +1,5 @@
-import './App.css';
 import React from 'react';
+import './App.css';
 import { BrowserRouter as Router, Route, Routes, Link, Navigate } from 'react-router-dom';
 import HomePage from './pages/Home';
 import AboutPage from './pages/About';
@@ -11,9 +11,19 @@ import Login from './pages/Login';
 import KanbanBoardPage from './pages/KanbanBoard';
 import ProfilePage from "./pages/Profile";
 import 'bootstrap-icons/font/bootstrap-icons.css';
+ comments-feature
+import { AuthProvider, useAuth } from './contexts/AuthContext'; // Context ✅
+=======
+ main
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+function AppContent() {
+  const { isAuthenticated, setIsAuthenticated } = useAuth();
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    setIsAuthenticated(false);
+    window.location.href = '/welcome';
+  };
 
   React.useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -41,8 +51,13 @@ function App() {
       <Routes>
         {/* Public pages - NO navbar */}
         <Route path="/welcome" element={<WelcomePage setIsAuthenticated={setIsAuthenticated} />} />
+ comments-feature
+        <Route path="/signup" element={<SignUp setIsAuthenticated={setIsAuthenticated} />} />
+        <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
+
         <Route path="/signup" element={<SignUp setIsAuthenticated={handleLogin} />} />
         <Route path="/login" element={<Login setIsAuthenticated={handleLogin} />} />
+ main
 
         {/* Protected pages - SHOW navbar */}
         {isAuthenticated ? (
@@ -104,6 +119,18 @@ function App() {
         )}
       </Routes>
     </Router>
+comments-feature
+  );
+}
+
+// ✅ Wrap the app with AuthProvider to access AuthContext
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+
+ main
   );
 }
 

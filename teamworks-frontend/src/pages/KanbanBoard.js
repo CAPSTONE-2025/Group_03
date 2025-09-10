@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from "axios";
-import CommentSection from "../components/CommentSection";
 
 const BACKLOG_URL = `${process.env.REACT_APP_API_URL}/api/backlog`;
 
@@ -86,9 +85,6 @@ function KanbanBoard() {
                                             <span className="badge bg-secondary">{task.dueDate}</span>
                                             <span className="badge bg-dark">{task.assignedTo}</span>
                                         </div>
-
-                                        {/* Comments */}
-                                        <CommentSection taskId={task.id} />
                                     </div>
                                 ))}
                         </div>

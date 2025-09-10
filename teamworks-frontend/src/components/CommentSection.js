@@ -1,24 +1,33 @@
+
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
-const CommentSection = ({ taskId }) => {
+const CommentSection = ({ taskId, currentUser }) => {
   const [comments, setComments] = useState([]);
   const [text, setText] = useState("");
 
   const fetchComments = async () => {
-    const res = await axios.get(`http://localhost:5000/api/comments/${taskId}`);
-    setComments(res.data);
+    try {
+      const res = await axios.get(`http://localhost:5000/api/comments/${taskId}`);
+      setComments(res.data);
+    } catch (err) {
+      console.error("Error fetching comments:", err);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await axios.post(`http://localhost:5000/api/comments/${taskId}`, {
-      author: "Gary Hu",
-      text: text,
-      timestamp: new Date().toISOString()
-    });
-    setText("");
-    fetchComments();
+    try {
+      await axios.post(`http://localhost:5000/api/comments/${taskId}`, {
+        author: currentUser.fullName || "Anonymous",
+        text,
+        timestamp: new Date().toISOString(),
+      });
+      setText("");
+      fetchComments();
+    } catch (err) {
+      console.error("Error posting comment:", err);
+    }
   };
 
   useEffect(() => {
@@ -26,16 +35,21 @@ const CommentSection = ({ taskId }) => {
   }, []);
 
   return (
-    <div className="comments">
-      <h4>Comments</h4>
-      {comments.map(comment => (
-        <div key={comment.id}>
+    <div className="comments mt-3">
+      <h6>Comments</h6>
+      {comments.map((comment) => (
+        <div key={comment._id}>
           <strong>{comment.author}</strong>: {comment.text}
         </div>
       ))}
-      <form onSubmit={handleSubmit}>
-        <input value={text} onChange={e => setText(e.target.value)} placeholder="Write a comment..." />
-        <button type="submit">Add</button>
+      <form onSubmit={handleSubmit} className="mt-2">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Write a comment..."
+          className="form-control"
+        />
+        <button type="submit" className="btn btn-sm btn-secondary mt-1">Add</button>
       </form>
     </div>
   );
