@@ -165,13 +165,15 @@ def login_user():
     try:
         user = get_users_collection().find_one({"email": data['email']})
         if user and bcrypt.checkpw(data['password'].encode('utf-8'), user['password']):
-            return jsonify({"message": "Login successful", "user": {
+            # Only return safe fields
+            response_user = {
                 "id": str(user['_id']),
-                "firstName": user['firstName'],
-                "lastName": user['lastName'],
-                "email": user['email'],
-                "bio": user.get('bio', '')
-            }}), 200
+                "firstName": user.get('firstName', ''),
+                "lastName": user.get('lastName', ''),
+                "email": user.get('email', ''),
+                "bio": user.get('bio', '')  # safe, default empty string
+            }
+            return jsonify({"message": "Login successful", "user": response_user}), 200
         else:
             return jsonify({"error": "Invalid email or password"}), 401
     except Exception as e:
@@ -210,7 +212,7 @@ def post_comment(task_id):
 
 # -------------------- PROFILE ROUTES --------------------
 
-@app.route('/users/<user_id>', methods=['PUT'])
+@app.route('/api/users/<user_id>', methods=['PUT'])
 def update_user_profile(user_id):
     data = request.json
     app.logger.info(f"Received profile update data for user {user_id}: {data}")
@@ -271,4 +273,4 @@ def update_user_profile(user_id):
 
 # -------------------- SERVER RUN --------------------
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    app.run(debug=True)

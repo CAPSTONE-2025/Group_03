@@ -18,7 +18,7 @@ export default function LoginForm({ setIsAuthenticated }) {
         try {
             console.log("Sending login data to backend:", data);
             console.log("API:", process.env.REACT_APP_API_URL); // Log the API URL
-            const response = await fetch("http://127.0.0.1:5001/users/login", {
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/login`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -55,7 +55,7 @@ export default function LoginForm({ setIsAuthenticated }) {
                                 {submitted ? (
                                     <p className="text-success text-center">Login successful! Redirecting...</p>
                                 ) : (
-                                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                                    <form onSubmit={handleSubmit(onSubmit)} className="mb-3">
                                         <div className="mb-3">
                                             <label htmlFor="email" className="form-label">Email</label>
                                             <input

@@ -49,7 +49,7 @@ export default function ProfileForm() {
             const user = JSON.parse(storedUser);
             const userId = user.id;
 
-            const response = await axios.put(`http://localhost:5001/users/${userId}`, {
+            const response = await axios.put(`${process.env.REACT_APP_API_URL}/api/users/${userId}`, {
                 firstName: data.firstName,
                 lastName: data.lastName,
                 email: data.email,
