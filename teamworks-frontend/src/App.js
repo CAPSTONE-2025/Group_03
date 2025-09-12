@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import { BrowserRouter as Router, Route, Routes, Link, Navigate } from 'react-router-dom';
 import HomePage from './pages/Home';
@@ -11,10 +11,25 @@ import Login from './pages/Login';
 import KanbanBoardPage from './pages/KanbanBoard';
 import ProfilePage from "./pages/Profile";
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import { AuthProvider, useAuth } from './contexts/AuthContext'; // Context ✅
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import { AuthProvider, useAuth } from './contexts/AuthContext'; 
+import axios from "axios";
 
 function AppContent() {
   const { isAuthenticated, setIsAuthenticated } = useAuth();
+  const [projects, setProjects] = useState([]);
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+
+  // fetch projects
+  useEffect(() => {
+    if (isAuthenticated) {
+      axios.get(`${process.env.REACT_APP_API_URL}/api/projects`)
+        .then(res => setProjects(res.data))
+        .catch(err => console.error("Failed to fetch projects", err));
+    }
+  }, [isAuthenticated]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -22,15 +37,30 @@ function AppContent() {
     window.location.href = '/welcome';
   };
 
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await axios.post(`${process.env.REACT_APP_API_URL}/api/projects`, {
+        name: newProjectName,
+        createdBy: JSON.parse(localStorage.getItem("user"))?.id,
+      });
+      setProjects([...projects, { id: res.data.id, name: newProjectName }]);
+      setNewProjectName("");
+      setShowCreateProject(false);
+    } catch (err) {
+      console.error("Failed to create project", err);
+    }
+  };
+
   return (
     <Router>
       <Routes>
-        {/* Public pages - NO navbar */}
+        {/* Public pages */}
         <Route path="/welcome" element={<WelcomePage setIsAuthenticated={setIsAuthenticated} />} />
         <Route path="/signup" element={<SignUp setIsAuthenticated={setIsAuthenticated} />} />
         <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
 
-        {/* Protected pages - SHOW navbar */}
+        {/* Protected pages */}
         {isAuthenticated ? (
           <Route
             path="*"
@@ -40,27 +70,52 @@ function AppContent() {
                 <nav className="navbar navbar-expand-lg navbar-light bg-light">
                   <div className="container">
                     <Link className="navbar-brand" to="/">TeamWorks</Link>
-                    <div className="collapse navbar-collapse show">
+                    <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                      <span className="navbar-toggler-icon"></span>
+                    </button>
+                    <div className="collapse navbar-collapse" id="navbarNav">
                       <ul className="navbar-nav me-auto">
                         <li className="nav-item"><Link className="nav-link" to="/">Home</Link></li>
                         <li className="nav-item"><Link className="nav-link" to="/about">About</Link></li>
-                        <li className="nav-item"><Link className="nav-link" to="/backlog">Backlog Board</Link></li>
-                        <li className="nav-item"><Link className="nav-link" to="/kanbanboard">Kanban Board</Link></li>
-                        <li className="nav-item"><Link className="nav-link" to="/calendar">Calendar</Link></li>
+
+                        {/* Projects dropdown */}
+                        <li className="nav-item dropdown">
+                          <a className="nav-link dropdown-toggle" href="/" id="projectsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Projects
+                          </a>
+                          <ul className="dropdown-menu" aria-labelledby="projectsDropdown">
+                            {projects.map((project) => (
+                              <li key={project.id} className="dropdown-submenu">
+                                <a
+                                  className="dropdown-item dropdown-toggle"
+                                  href="#"
+                                  onClick={(e) => e.preventDefault()} // prevents page reload
+                                >
+                                  {project.name}
+                                </a>
+                                <ul className="dropdown-menu">
+                                  <li><Link className="dropdown-item" to={`/projects/${project.id}/backlog`}>Backlog</Link></li>
+                                  <li><Link className="dropdown-item" to={`/projects/${project.id}/kanbanboard`}>Kanban</Link></li>
+                                  <li><Link className="dropdown-item" to={`/projects/${project.id}/calendar`}>Calendar</Link></li>
+                                </ul>
+                              </li>
+                            ))}
+                            <li><hr className="dropdown-divider" /></li>
+                            <li>
+                              <button
+                                className="dropdown-item text-primary"
+                                onClick={() => setShowCreateProject(true)}
+                              >
+                                + Create Project
+                              </button>
+                            </li>
+                          </ul>
+                        </li>
                       </ul>
                     </div>
                     <div className="d-flex align-items-center">
-                      <Link className="nav-link me-3" to="/profile" title="Profile">
-                        <i className="bi bi-person fs-5"></i>
-                      </Link>
-                      <button
-                        className="btn btn-link nav-link p-0"
-                        onClick={handleLogout}
-                        title="Logout"
-                        style={{ border: 'none', background: 'none' }}
-                      >
-                        <i className="bi bi-box-arrow-right fs-5"></i>
-                      </button>
+                      <Link className="nav-link me-3" to="/profile"><i className="bi bi-person fs-5"></i></Link>
+                      <button className="btn btn-link nav-link p-0" onClick={handleLogout}><i className="bi bi-box-arrow-right fs-5"></i></button>
                     </div>
                   </div>
                 </nav>
@@ -70,9 +125,9 @@ function AppContent() {
                   <Routes>
                     <Route path="/home" element={<HomePage />} />
                     <Route path="/about" element={<AboutPage />} />
-                    <Route path="/calendar" element={<CalendarPage />} />
-                    <Route path="/backlog" element={<BacklogPage />} />
-                    <Route path="/kanbanboard" element={<KanbanBoardPage />} />
+                    <Route path="/projects/:projectId/calendar" element={<CalendarPage />} />
+                    <Route path="/projects/:projectId/backlog" element={<BacklogPage />} />
+                    <Route path="/projects/:projectId/kanbanboard" element={<KanbanBoardPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/" element={<HomePage />} />
                   </Routes>
@@ -89,11 +144,34 @@ function AppContent() {
           <Route path="*" element={<Navigate to="/welcome" />} />
         )}
       </Routes>
+
+      {/* Create Project Modal */}
+      {showCreateProject && (
+        <div className="modal show d-block" tabIndex="-1">
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Create Project</h5>
+                <button type="button" className="btn-close" onClick={() => setShowCreateProject(false)}></button>
+              </div>
+              <div className="modal-body">
+                <form onSubmit={handleCreateProject}>
+                  <div className="mb-3">
+                    <label className="form-label">Project Name</label>
+                    <input type="text" className="form-control" value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} required />
+                  </div>
+                  <button type="submit" className="btn btn-primary">Create</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Router>
   );
 }
 
-// ✅ Wrap the app with AuthProvider to access AuthContext
+// ✅ Wrap with AuthProvider
 function App() {
   return (
     <AuthProvider>

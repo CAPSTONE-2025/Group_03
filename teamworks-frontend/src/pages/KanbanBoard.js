@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from "axios";
+import { useParams } from 'react-router-dom';
 
-const BACKLOG_URL = `${process.env.REACT_APP_API_URL}/api/backlog`;
 
 function KanbanBoard() {
+    const { projectId } = useParams();
+    const BACKLOG_URL = `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/backlog`;
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -21,8 +23,8 @@ function KanbanBoard() {
             }
         };
 
-        fetchTasks();
-    }, []);
+       if (projectId) fetchTasks();
+    }, [projectId, BACKLOG_URL]);
 
     const columns = [
         { status: "To Do", color: "#f8d7da" },

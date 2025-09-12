@@ -63,3 +63,21 @@
   object-fit: cover;      
   border-radius: 15px;     
 }
+
+
+/* Enable dropdown-submenu (multi-level dropdowns) */
+.dropdown-submenu {
+  position: relative;
+}
+
+.dropdown-submenu > .dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-left: 0.1rem;
+  margin-right: 0.1rem;
+  display: none;
+}
+
+.dropdown-submenu:hover > .dropdown-menu {
+  display: block;
+}
