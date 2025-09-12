@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from model import get_users_collection, get_comments_collection
+from model import get_users_collection, get_comments_collection, get_projects_collection
 from model import backlog_collection
 import bcrypt
 from bson import ObjectId
@@ -14,12 +14,62 @@ CORS(app, origins=["http://localhost:3000"])  # CORS for frontend
 def home():
     return jsonify({"message": "Welcome to Teamworks!"})
 
+
+# -------------------- PROJECT ROUTES --------------------
+@app.route('/api/projects', methods=['POST'])
+def create_project():
+    data = request.json
+    project = {
+        "name": data["name"],
+        "description": data.get("description", ""),
+        "createdBy": ObjectId(data["createdBy"]),
+        "members": [ObjectId(data["createdBy"])],
+        "createdAt": datetime.now(),
+        "updatedAt": datetime.now(),
+    }
+    result = get_projects_collection().insert_one(project)
+    return jsonify({"message": "Project created", "id": str(result.inserted_id)}), 201 
+
+
+@app.route('/api/projects', methods=['GET'])
+def list_projects():
+    projects = []
+    for p in get_projects_collection().find():
+        projects.append({
+            "id": str(p["_id"]),
+            "name": p["name"],
+            "description": p["description"],
+            "createdBy": str(p["createdBy"]),
+            "members": [str(member) for member in p["members"]],
+            "createdAt": p["createdAt"],
+            "updatedAt": p["updatedAt"]
+        })
+    return jsonify(projects)
+
+
 # -------------------- BACKLOG ROUTES --------------------
 
-@app.route('/api/backlog', methods=['GET'])
-def get_backlog():
+# @app.route('/api/backlog', methods=['GET'])
+# def get_backlog():
+#     tasks = []
+#     for task in backlog_collection.find():
+#         tasks.append({
+#             "id": str(task["_id"]),
+#             "title": task["title"],
+#             "description": task["description"],
+#             "label": task["label"],
+#             "status": task["status"],
+#             "priority": task["priority"],
+#             "assignedTo": task["assignedTo"],
+#             "dueDate": task["dueDate"]
+#         })
+#     return jsonify(tasks)
+
+
+@app.route('/api/projects/<project_id>/backlog', methods=['GET'])
+def get_project_backlog(project_id):
     tasks = []
-    for task in backlog_collection.find():
+    for task in backlog_collection.find({"projectId": ObjectId(project_id)}):
         tasks.append({
             "id": str(task["_id"]),
             "title": task["title"],
@@ -28,12 +78,35 @@ def get_backlog():
             "status": task["status"],
             "priority": task["priority"],
             "assignedTo": task["assignedTo"],
-            "dueDate": task["dueDate"]
+            "dueDate": task["dueDate"],
+            "projectId": str(task["projectId"]),
         })
     return jsonify(tasks)
 
-@app.route('/api/backlog', methods=['POST'])
-def create_backlog():
+
+# @app.route('/api/backlog', methods=['POST'])
+# def create_backlog():
+#     data = request.json
+#     required_fields = ["title", "description", "label", "status", "priority", "assignedTo", "dueDate"]
+#     for field in required_fields:
+#         if field not in data:
+#             return jsonify({"error": f"{field} is required"}), 400
+
+#     task = {
+#         "title": data["title"],
+#         "description": data["description"],
+#         "label": data["label"],
+#         "status": data["status"],
+#         "priority": data["priority"],
+#         "assignedTo": data["assignedTo"],
+#         "dueDate": data["dueDate"]
+#     }
+#     result = backlog_collection.insert_one(task)
+#     return jsonify({"message": "Task created", "id": str(result.inserted_id)}), 201
+
+
+@app.route('/api/projects/<project_id>/backlog', methods=['POST'])
+def create_project_backlog(project_id):
     data = request.json
     required_fields = ["title", "description", "label", "status", "priority", "assignedTo", "dueDate"]
     for field in required_fields:
@@ -47,10 +120,37 @@ def create_backlog():
         "status": data["status"],
         "priority": data["priority"],
         "assignedTo": data["assignedTo"],
-        "dueDate": data["dueDate"]
+        "dueDate": data["dueDate"],
+        "projectId": ObjectId(project_id),
     }
     result = backlog_collection.insert_one(task)
     return jsonify({"message": "Task created", "id": str(result.inserted_id)}), 201
+
+
+@app.route('/api/projects/<project_id>/backlog/<task_id>', methods=['PUT'])
+def update_task(project_id, task_id):
+    data = request.json
+    task = backlog_collection.find_one({"_id": ObjectId(task_id), "projectId": ObjectId(project_id)})
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+
+    allowed_fields = ["title", "description", "label", "status", "priority", "assignedTo", "dueDate"]
+    update = {field: data[field] for field in allowed_fields if field in data}
+
+    if not update:
+        return jsonify({"error": "No valid fields to update"}), 400
+
+    backlog_collection.update_one({"_id": ObjectId(task_id)}, {"$set": update})
+    return jsonify({"message": "Task updated successfully"})
+
+
+@app.route('/api/projects/<project_id>/backlog/<task_id>', methods=['DELETE'])
+def delete_task(project_id, task_id):
+    result = backlog_collection.delete_one({"_id": ObjectId(task_id), "projectId": ObjectId(project_id)})
+    if result.deleted_count == 0:
+        return jsonify({"error": "Task not found"}), 404
+    return jsonify({"message": "Task deleted successfully"})
+
 
 # ORIGINAL GREEN BLOCK (Do not remove or modify)
 # @app.route('/backlog/<task_id>', methods=['PUT'])
@@ -81,42 +181,42 @@ def create_backlog():
 #         return jsonify({"error": "Task not updated"}), 400
 #     return jsonify({"message": "Task updated successfully"})
 
-@app.route('/api/backlog/<task_id>', methods=['PUT'])
-def update_task(task_id):
-    data = request.json
-    if not data:
-        return jsonify({"error": "Missing JSON payload"}), 400
+# @app.route('/api/backlog/<task_id>', methods=['PUT'])
+# def update_task(task_id):
+#     data = request.json
+#     if not data:
+#         return jsonify({"error": "Missing JSON payload"}), 400
 
-    task = backlog_collection.find_one({"_id": ObjectId(task_id)})
-    if not task:
-        return jsonify({"error": "Task not found"}), 404
+#     task = backlog_collection.find_one({"_id": ObjectId(task_id)})
+#     if not task:
+#         return jsonify({"error": "Task not found"}), 404
 
-    allowed_fields = ["title", "description", "label", "status", "priority", "assignedTo", "dueDate"]
-    update = {}
+#     allowed_fields = ["title", "description", "label", "status", "priority", "assignedTo", "dueDate"]
+#     update = {}
 
-    for field in allowed_fields:
-        if field in data:
-            update[field] = data[field]
+#     for field in allowed_fields:
+#         if field in data:
+#             update[field] = data[field]
 
-    if not update:
-        return jsonify({"error": "No valid fields to update"}), 400
+#     if not update:
+#         return jsonify({"error": "No valid fields to update"}), 400
 
-    result = backlog_collection.update_one(
-        {"_id": ObjectId(task_id)},
-        {"$set": update}
-    )
+#     result = backlog_collection.update_one(
+#         {"_id": ObjectId(task_id)},
+#         {"$set": update}
+#     )
 
-    if result.modified_count == 0:
-        return jsonify({"message": "No changes were made"}), 200
+#     if result.modified_count == 0:
+#         return jsonify({"message": "No changes were made"}), 200
 
-    return jsonify({"message": "Task updated successfully"}), 200
+#     return jsonify({"message": "Task updated successfully"}), 200
 
-@app.route('/api/backlog/<task_id>', methods=['DELETE'])
-def delete_task(task_id):
-    result = backlog_collection.delete_one({"_id": ObjectId(task_id)})
-    if result.deleted_count == 0:
-        return jsonify({"error": "Task not found"}), 404
-    return jsonify({"message": "Task deleted successfully"})
+# @app.route('/api/backlog/<task_id>', methods=['DELETE'])
+# def delete_task(task_id):
+#     result = backlog_collection.delete_one({"_id": ObjectId(task_id)})
+#     if result.deleted_count == 0:
+#         return jsonify({"error": "Task not found"}), 404
+#     return jsonify({"message": "Task deleted successfully"})
 
 # -------------------- USER AUTH ROUTES --------------------
 
@@ -182,43 +282,75 @@ def login_user():
 
 # -------------------- COMMENT ROUTES --------------------
 
-@app.route('/api/comments/<task_id>', methods=['GET'])
-def get_comments(task_id):
+# @app.route('/api/comments/<task_id>', methods=['GET'])
+# def get_comments(task_id):
+#     comments = []
+#     for comment in get_comments_collection().find({"taskId": ObjectId(task_id)}):
+#         comments.append({
+#             "id": str(comment["_id"]),
+#             "taskId": comment["taskId"],
+#             "author": comment["author"],
+#             "text": comment["text"],
+#             "timestamp": comment["timestamp"]
+#         })
+#     return jsonify(comments)
+
+# @app.route("/api/backlog/<task_id>/comments", methods=["POST"])
+# def add_comment(task_id):
+#     data = request.json
+#     author = data.get("author", "Anonymous")
+#     text = data.get("text")
+
+#     if not text:
+#         return jsonify({"error": "Comment text is required"}), 400
+
+#     # Check if the task exists in the backlog_collection
+#     task = backlog_collection.find_one({"_id": ObjectId(task_id)})
+#     if not task:
+#         return jsonify({"error": "Task not found"}), 404
+
+#     # Insert comment into the comments collection
+#     comment = {
+#         "taskId": ObjectId(task_id),
+#         "author": author,
+#         "text": text,
+#         "timestamp": datetime.now()
+#     }
+#     result = get_comments_collection().insert_one(comment)
+#     comment["_id"] = str(result.inserted_id)
+
+#     return jsonify(comment), 201
+
+
+@app.route('/api/projects/<project_id>/backlog/<task_id>/comments', methods=['GET'])
+def get_comments(project_id, task_id):
     comments = []
-    for comment in get_comments_collection().find({"taskId": task_id}):
+    for comment in get_comments_collection().find({"taskId": ObjectId(task_id)}):
         comments.append({
             "id": str(comment["_id"]),
-            "taskId": comment["taskId"],
+            "taskId": str(comment["taskId"]),
             "author": comment["author"],
             "text": comment["text"],
             "timestamp": comment["timestamp"]
         })
     return jsonify(comments)
 
-@app.route("/api/backlog/<task_id>/comments", methods=["POST"])
-def add_comment(task_id):
-    data = request.json
-    author = data.get("author", "Anonymous")
-    text = data.get("text")
 
+@app.route('/api/projects/<project_id>/backlog/<task_id>/comments', methods=['POST'])
+def add_comment(project_id, task_id):
+    data = request.json
+    text = data.get("text")
     if not text:
         return jsonify({"error": "Comment text is required"}), 400
 
-    # Check if the task exists in the backlog_collection
-    task = backlog_collection.find_one({"_id": ObjectId(task_id)})
-    if not task:
-        return jsonify({"error": "Task not found"}), 404
-
-    # Insert comment into the comments collection
     comment = {
-        "taskId": task_id,
-        "author": author,
+        "taskId": ObjectId(task_id),
+        "author": data.get("author", "Anonymous"),
         "text": text,
-        "timestamp": datetime.utcnow()
+        "timestamp": datetime.now(timezone.utc)
     }
     result = get_comments_collection().insert_one(comment)
     comment["_id"] = str(result.inserted_id)
-
     return jsonify(comment), 201
 
 # -------------------- PROFILE ROUTES --------------------

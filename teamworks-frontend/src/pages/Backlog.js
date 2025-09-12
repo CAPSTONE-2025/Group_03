@@ -4,10 +4,13 @@ import AddTaskForm from '../components/AddTaskForm';
 import TaskForm from '../components/TaskForm';
 import EditTaskForm from '../components/EditTaskForm';
 import { AuthContext } from '../contexts/AuthContext';  
-
-const API_URL = `${process.env.REACT_APP_API_URL}/api/backlog`;
+import { useParams } from 'react-router-dom';
 
 function Backlog() {
+    const { projectId } = useParams();
+    const API_URL = projectId 
+        ? `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/backlog` 
+        : null;
     const { user } = useContext(AuthContext);  // ✅ FIX: moved before using user
     console.log(user.fullName);
 
@@ -24,6 +27,8 @@ function Backlog() {
     const [newComment, setNewComment] = useState("");
 
     useEffect(() => {
+        if (!API_URL) return; // ✅ prevent bad fetch on first render
+
         const fetchTasks = async () => {
             try {
                 const response = await axios.get(API_URL);
@@ -34,8 +39,8 @@ function Backlog() {
                 setLoading(false);
             }
         };
-        fetchTasks();
-    }, []);
+        if (projectId) fetchTasks();
+    }, [projectId, API_URL]);
 
     const handleAddTask = async (newTask) => {
         try {

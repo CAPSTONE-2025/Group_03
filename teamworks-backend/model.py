@@ -19,11 +19,16 @@ else:
 # Access database and collections
 db = client["teamworks_db"]
 
+projects_collection = db["projects"]
 backlog_collection = db["backlog_items"]
 users_collection = db["users"]
 comments_collection = db["task_comments"]
 
+
 # Getter functions
+def get_projects_collection():
+    return projects_collection
+
 def get_users_collection():
     return users_collection
 
