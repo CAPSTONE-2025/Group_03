@@ -54,15 +54,24 @@ function TaskCalendar() {
       <h3 className="mb-3">Project Calendar</h3>
       <div className="mb-4">
         <Calendar onChange={setDate} value={date}
+
           tileClassName={({ date, view }) => {
             const formattedDate = date.toISOString().split("T")[0];
             if (events.some(event => event.dueDate === formattedDate)) {
               return "highlight-tile";
             }
           }}
+
           tileContent={({ date, view }) => {
             const formattedDate = date.toISOString().split("T")[0];
-            if (events.some(event => event.dueDate === formattedDate)) {             
+
+            // Get today's date
+            const today = new Date().toISOString().split("T")[0];
+
+            if (events.some(event => event.dueDate === formattedDate)) {
+              // Check if event is overdue
+              const isPast = formattedDate < today
+
               return (
                 <div
                   style={{
@@ -71,7 +80,7 @@ function TaskCalendar() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    background: "#4292ddff",
+                    background: isPast ? "#e05757ff" : "#4292ddff",
                     color: "white",
                     borderRadius: "50%",
                     margin: "auto",
@@ -91,7 +100,7 @@ function TaskCalendar() {
           flexWrap: "wrap",   // allows cards to move to next line if needed
           gap: "16px",        // space between cards
           justifyContent: "flex-start", // or center/space-between
-          border: "2px black dashed" // for understanding how much space this div takes
+          // border: "2px black dashed" // for understanding how much space this div takes
         }}>
         {events.filter(event => event.dueDate === date.toISOString().split("T")[0]).map(event => (
           <div
