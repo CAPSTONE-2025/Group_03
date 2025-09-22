@@ -2,13 +2,15 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
-const CommentSection = ({ taskId, currentUser }) => {
+const CommentSection = ({ projectId, taskId, currentUser }) => {
   const [comments, setComments] = useState([]);
   const [text, setText] = useState("");
 
   const fetchComments = async () => {
     try {
-      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/comments/${taskId}`);
+      const res = await axios.get(
+        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/backlog/${taskId}/comments`
+      );
       setComments(res.data);
     } catch (err) {
       console.error("Error fetching comments:", err);
@@ -18,13 +20,15 @@ const CommentSection = ({ taskId, currentUser }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${process.env.REACT_APP_API_URL}/api/comments/${taskId}`, {
-        author: currentUser.fullName || "Anonymous",
-        text,
-        timestamp: new Date().toISOString(),
-      });
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/backlog/${taskId}/comments`,
+        {
+          author: currentUser?.fullName || "Anonymous",
+          text,
+        }
+      );
       setText("");
-      fetchComments();
+      setComments([...comments, res.data]); // append new comment
     } catch (err) {
       console.error("Error posting comment:", err);
     }
@@ -32,13 +36,13 @@ const CommentSection = ({ taskId, currentUser }) => {
 
   useEffect(() => {
     fetchComments();
-  }, []);
+  }, [projectId, taskId]);
 
   return (
     <div className="comments mt-3">
       <h6>Comments</h6>
       {comments.map((comment) => (
-        <div key={comment._id}>
+        <div key={comment.id}>
           <strong>{comment.author}</strong>: {comment.text}
         </div>
       ))}

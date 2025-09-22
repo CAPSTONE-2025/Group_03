@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export const AuthContext = createContext();
@@ -7,13 +6,22 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Check authentication status on mount
+  const buildFullName = (u) => {
+    if (!u) return null;
+    if (!u.fullName && (u.firstName || u.lastName)) {
+      return { ...u, fullName: `${u.firstName || ""} ${u.lastName || ""}`.trim() };
+    }
+    return u;
+  };
+
   useEffect(() => {
     const checkAuth = () => {
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
         try {
-          const userData = JSON.parse(storedUser);
+          let userData = JSON.parse(storedUser);
+          userData = buildFullName(userData);
+
           if (userData && userData.id) {
             setUser(userData);
             setIsAuthenticated(true);
@@ -33,7 +41,6 @@ export const AuthProvider = ({ children }) => {
 
     checkAuth();
 
-    // Listen for storage changes (cross-tab synchronization)
     const handleStorageChange = (e) => {
       if (e.key === "user") {
         checkAuth();
@@ -45,9 +52,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const handleLogin = (userData) => {
-    setUser(userData);
+    const normalizedUser = buildFullName(userData);
+    setUser(normalizedUser);
     setIsAuthenticated(true);
-    localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.setItem("user", JSON.stringify(normalizedUser));
   };
 
   const handleLogout = () => {
@@ -57,14 +65,16 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      setUser, 
-      isAuthenticated, 
-      setIsAuthenticated,
-      handleLogin,
-      handleLogout
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        setUser,
+        isAuthenticated,
+        setIsAuthenticated,
+        handleLogin,
+        handleLogout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

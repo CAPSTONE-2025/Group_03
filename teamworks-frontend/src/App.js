@@ -22,14 +22,23 @@ function AppContent() {
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
 
-  // fetch projects
+  // ✅ Fetch only projects where logged-in user is a member
   useEffect(() => {
-    if (isAuthenticated) {
-      axios.get(`${process.env.REACT_APP_API_URL}/api/projects`)
-        .then(res => setProjects(res.data))
-        .catch(err => console.error("Failed to fetch projects", err));
+    const fetchProjects = async () => {
+      try {
+        const res = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
+        );
+        setProjects(res.data);
+      } catch (err) {
+        console.error("Failed to fetch projects", err);
+      }
+    };
+
+    if (isAuthenticated && user) {
+      fetchProjects();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user]);
 
   const handleLogoutClick = () => {
     handleLogout();
@@ -41,7 +50,7 @@ function AppContent() {
     try {
       const res = await axios.post(`${process.env.REACT_APP_API_URL}/api/projects`, {
         name: newProjectName,
-        createdBy: JSON.parse(localStorage.getItem("user"))?.id,
+        createdBy: user.id,
       });
       setProjects([...projects, { id: res.data.id, name: newProjectName }]);
       setNewProjectName("");

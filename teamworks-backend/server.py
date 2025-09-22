@@ -31,20 +31,38 @@ def create_project():
     return jsonify({"message": "Project created", "id": str(result.inserted_id)}), 201 
 
 
-@app.route('/api/projects', methods=['GET'])
-def list_projects():
+@app.route('/api/projects/<user_id>', methods=['GET'])
+def list_user_projects(user_id):
     projects = []
-    for p in get_projects_collection().find():
+    for p in get_projects_collection().find({"members": ObjectId(user_id)}):
         projects.append({
             "id": str(p["_id"]),
             "name": p["name"],
-            "description": p["description"],
+            "description": p.get("description", ""),
             "createdBy": str(p["createdBy"]),
             "members": [str(member) for member in p["members"]],
-            "createdAt": p["createdAt"],
-            "updatedAt": p["updatedAt"]
+            "createdAt": p["createdAt"].isoformat() if isinstance(p["createdAt"], datetime) else str(p["createdAt"]),
+            "updatedAt": p["updatedAt"].isoformat() if isinstance(p["updatedAt"], datetime) else str(p["updatedAt"]),
         })
     return jsonify(projects)
+
+# -------------------- PROJECT INVITE ---------------------
+@app.route('/api/projects/<project_id>/invite', methods=['POST'])
+def invite_member(project_id):
+    data = request.json
+    user_id = data.get("userId")  # user being invited
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+
+    result = get_projects_collection().update_one(
+        {"_id": ObjectId(project_id)},
+        {"$addToSet": {"members": ObjectId(user_id)}}  # prevents duplicates
+    )
+
+    if result.modified_count == 0:
+        return jsonify({"error": "Project not found or user already a member"}), 404
+
+    return jsonify({"message": "User invited successfully"}), 200
 
 
 # -------------------- BACKLOG ROUTES --------------------
@@ -320,21 +338,18 @@ def login_user():
 #     comment["_id"] = str(result.inserted_id)
 
 #     return jsonify(comment), 201
-
-
 @app.route('/api/projects/<project_id>/backlog/<task_id>/comments', methods=['GET'])
 def get_comments(project_id, task_id):
     comments = []
-    for comment in get_comments_collection().find({"taskId": ObjectId(task_id)}):
+    for comment in get_comments_collection().find({"taskId": ObjectId(task_id)}).sort("timestamp", 1):
         comments.append({
             "id": str(comment["_id"]),
             "taskId": str(comment["taskId"]),
             "author": comment["author"],
             "text": comment["text"],
-            "timestamp": comment["timestamp"]
+            "timestamp": comment["timestamp"].isoformat() if isinstance(comment["timestamp"], datetime) else str(comment["timestamp"])
         })
     return jsonify(comments)
-
 
 @app.route('/api/projects/<project_id>/backlog/<task_id>/comments', methods=['POST'])
 def add_comment(project_id, task_id):
@@ -347,11 +362,18 @@ def add_comment(project_id, task_id):
         "taskId": ObjectId(task_id),
         "author": data.get("author", "Anonymous"),
         "text": text,
-        "timestamp": datetime.now(timezone.utc)
+        "timestamp": datetime.utcnow()
     }
     result = get_comments_collection().insert_one(comment)
-    comment["_id"] = str(result.inserted_id)
-    return jsonify(comment), 201
+
+    response_comment = {
+        "id": str(result.inserted_id),
+        "taskId": str(comment["taskId"]),
+        "author": comment["author"],
+        "text": comment["text"],
+        "timestamp": comment["timestamp"].isoformat()
+    }
+    return jsonify(response_comment), 201
 
 # -------------------- PROFILE ROUTES --------------------
 
