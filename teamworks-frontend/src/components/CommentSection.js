@@ -8,7 +8,7 @@ const CommentSection = ({ taskId, currentUser }) => {
 
   const fetchComments = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/comments/${taskId}`);
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/comments/${taskId}`);
       setComments(res.data);
     } catch (err) {
       console.error("Error fetching comments:", err);
@@ -18,7 +18,7 @@ const CommentSection = ({ taskId, currentUser }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`http://localhost:5000/api/comments/${taskId}`, {
+      await axios.post(`${process.env.REACT_APP_API_URL}/api/comments/${taskId}`, {
         author: currentUser.fullName || "Anonymous",
         text,
         timestamp: new Date().toISOString(),

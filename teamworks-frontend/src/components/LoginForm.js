@@ -28,8 +28,7 @@ export default function LoginForm({ setIsAuthenticated }) {
 
             const result = await response.json();
             if (response.ok) {
-                setIsAuthenticated(true);  
-                localStorage.setItem("user", JSON.stringify(result.user));
+                setIsAuthenticated(result.user);  
                 navigate("/");  
             } else {
                 alert(result.error);

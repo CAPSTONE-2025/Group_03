@@ -17,7 +17,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import axios from "axios";
 
 function AppContent() {
-  const { isAuthenticated, setIsAuthenticated } = useAuth();
+  const { isAuthenticated, user, handleLogout } = useAuth();
   const [projects, setProjects] = useState([]);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -31,9 +31,8 @@ function AppContent() {
     }
   }, [isAuthenticated]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    setIsAuthenticated(false);
+  const handleLogoutClick = () => {
+    handleLogout();
     window.location.href = '/welcome';
   };
 
@@ -56,9 +55,9 @@ function AppContent() {
     <Router>
       <Routes>
         {/* Public pages */}
-        <Route path="/welcome" element={<WelcomePage setIsAuthenticated={setIsAuthenticated} />} />
-        <Route path="/signup" element={<SignUp setIsAuthenticated={setIsAuthenticated} />} />
-        <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
+        <Route path="/welcome" element={<WelcomePage />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/login" element={<Login />} />
 
         {/* Protected pages */}
         {isAuthenticated ? (
@@ -115,7 +114,7 @@ function AppContent() {
                     </div>
                     <div className="d-flex align-items-center">
                       <Link className="nav-link me-3" to="/profile"><i className="bi bi-person fs-5"></i></Link>
-                      <button className="btn btn-link nav-link p-0" onClick={handleLogout}><i className="bi bi-box-arrow-right fs-5"></i></button>
+                      <button className="btn btn-link nav-link p-0" onClick={handleLogoutClick}><i className="bi bi-box-arrow-right fs-5"></i></button>
                     </div>
                   </div>
                 </nav>

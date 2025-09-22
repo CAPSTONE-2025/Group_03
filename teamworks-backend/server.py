@@ -416,4 +416,4 @@ def update_user_profile(user_id):
 
 # -------------------- SERVER RUN --------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=5001)
