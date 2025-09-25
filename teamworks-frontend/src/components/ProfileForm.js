@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function ProfileForm() {
     const {
@@ -9,6 +10,8 @@ export default function ProfileForm() {
         setValue,
         formState: { errors },
     } = useForm();
+
+    const { setUser } = useAuth();
 
     const [saved, setSaved] = useState(false);
     const [firstName, setFirstName] = useState("");
@@ -53,7 +56,7 @@ export default function ProfileForm() {
                 firstName: data.firstName,
                 lastName: data.lastName,
                 email: data.email,
-                bio: data.bio || ""
+                bio: data.bio || "",
             });
 
             if (response.status === 200) {
@@ -63,10 +66,13 @@ export default function ProfileForm() {
                     firstName: data.firstName,
                     lastName: data.lastName,
                     email: data.email,
-                    bio: data.bio || ""
+                    bio: data.bio || "",
+               // 🔥 build fullName so context updates immediately
+                fullName: `${data.firstName} ${data.lastName}`.trim(),
                 };
                 localStorage.setItem("user", JSON.stringify(updatedUser));
-                
+                setUser(updatedUser); // 🔥 force re-render globally
+
                 setFirstName(data.firstName);
                 setSaved(true);
                 setIsEditing(false); // Exit edit mode after successful save
