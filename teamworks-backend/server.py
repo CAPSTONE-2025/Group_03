@@ -5,6 +5,7 @@ from model import backlog_collection
 import bcrypt
 from bson import ObjectId
 from datetime import datetime
+from functools import wraps
 
 app = Flask(__name__)
 CORS(app)
@@ -24,6 +25,7 @@ def create_project():
         "description": data.get("description", ""),
         "createdBy": ObjectId(data["createdBy"]),
         "members": [ObjectId(data["createdBy"])],
+        "pendingInvites": [],
         "createdAt": datetime.now(),
         "updatedAt": datetime.now(),
     }
@@ -46,23 +48,110 @@ def list_user_projects(user_id):
         })
     return jsonify(projects)
 
+@app.route('/api/project/<project_id>', methods=['GET'])
+def get_project(project_id):
+    p = get_projects_collection().find_one({"_id": ObjectId(project_id)})
+    if not p:
+        return jsonify({"error": "Project not found"}), 404
+    return jsonify({
+        "id": str(p["_id"]),
+        "name": p.get("name", ""),
+        "description": p.get("description", ""),
+        "createdBy": str(p["createdBy"]),
+        "members": [str(m) for m in p.get("members", [])],
+    })
+
+#-------------------- Owner/auth helpers--------------------
+def get_request_user_id():
+    uid = request.headers.get("X-User-Id")
+    try:
+        return ObjectId(uid) if uid else None
+    except Exception:
+        return None
+
+def require_project_owner(fn):
+    @wraps(fn)
+    def wrapper(project_id, *args, **kwargs):
+        user_id = get_request_user_id()
+        if not user_id:
+            return jsonify({"error": "Missing X-User-Id header"}), 401
+        proj = get_projects_collection().find_one({"_id": ObjectId(project_id)}, {"createdBy": 1})
+        if not proj:
+            return jsonify({"error": "Project not found"}), 404
+        if str(proj["createdBy"]) != str(user_id):
+            return jsonify({"error": "Only the project owner can invite"}), 403
+        request._request_user_id = user_id
+        return fn(project_id, *args, **kwargs)
+    return wrapper
+
+
 # -------------------- PROJECT INVITE ---------------------
+# @app.route('/api/projects/<project_id>/invite', methods=['POST'])
+# def invite_member(project_id):
+#     data = request.json
+#     user_id = data.get("userId")  # user being invited
+#     if not user_id:
+#         return jsonify({"error": "userId is required"}), 400
+
+#     result = get_projects_collection().update_one(
+#         {"_id": ObjectId(project_id)},
+#         {"$addToSet": {"members": ObjectId(user_id)}}  # prevents duplicates
+#     )
+
+#     if result.modified_count == 0:
+#         return jsonify({"error": "Project not found or user already a member"}), 404
+
+#     return jsonify({"message": "User invited successfully"}), 200
+
 @app.route('/api/projects/<project_id>/invite', methods=['POST'])
-def invite_member(project_id):
-    data = request.json
-    user_id = data.get("userId")  # user being invited
-    if not user_id:
-        return jsonify({"error": "userId is required"}), 400
+@require_project_owner
+def invite_members(project_id):
+    data = request.json or {}
+    emails = data.get("emails", [])
+    if not isinstance(emails, list) or not emails:
+        return jsonify({"error": "Provide emails as a non-empty array"}), 400
 
-    result = get_projects_collection().update_one(
-        {"_id": ObjectId(project_id)},
-        {"$addToSet": {"members": ObjectId(user_id)}}  # prevents duplicates
-    )
+    # normalize + dedupe
+    normalized = list({(e or "").strip().lower() for e in emails if isinstance(e, str) and e.strip()})
+    if not normalized:
+        return jsonify({"error": "No valid emails provided"}), 400
 
-    if result.modified_count == 0:
-        return jsonify({"error": "Project not found or user already a member"}), 404
+    projects = get_projects_collection()
+    proj = projects.find_one({"_id": ObjectId(project_id)}, {"pendingInvites": 1})
+    if not proj:
+        return jsonify({"error": "Project not found"}), 404
 
-    return jsonify({"message": "User invited successfully"}), 200
+    # prevent duplicates
+    already = { (pi.get("email") or "").lower() for pi in proj.get("pendingInvites", []) }
+    new_pending = []
+    for email in normalized:
+        if email not in already:
+            new_pending.append({
+                "email": email,
+                "status": "pending",
+                "invitedBy": request._request_user_id,
+                "invitedAt": datetime.utcnow()
+            })
+
+    if new_pending:
+        projects.update_one(
+            {"_id": ObjectId(project_id)},
+            {"$push": {"pendingInvites": {"$each": new_pending}},
+             "$set": {"updatedAt": datetime.utcnow()}}
+        )
+
+    # return fresh pending list
+    proj2 = projects.find_one({"_id": ObjectId(project_id)}, {"pendingInvites": 1})
+    pending_serialized = [
+        {
+            "email": pi.get("email"),
+            "status": pi.get("status", "pending"),
+            "invitedBy": str(pi.get("invitedBy")) if pi.get("invitedBy") else None,
+            "invitedAt": pi.get("invitedAt").isoformat() if isinstance(pi.get("invitedAt"), datetime) else str(pi.get("invitedAt", "")),
+        }
+        for pi in proj2.get("pendingInvites", [])
+    ]
+    return jsonify({"pendingInvites": pending_serialized}), 200
 
 
 # -------------------- BACKLOG ROUTES --------------------
