@@ -11,6 +11,15 @@ function Backlog() {
   const { projectId } = useParams();
   const { user } = useContext(AuthContext);
 
+    // ✅ Set the caller header for Flask guards (owner/access checks)
+  useEffect(() => {
+    if (user?.id) {
+      axios.defaults.headers.common["X-User-Id"] = user.id;   // <-- NEW
+    } else {
+      delete axios.defaults.headers.common["X-User-Id"];
+    }
+  }, [user]);
+
   // -------------------- STATE --------------------
   const [tasks, setTasks] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -18,9 +27,12 @@ function Backlog() {
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [projectName, setProjectName] = useState("");
 
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
+
+  const [pendingInvites, setPendingInvites] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,28 +41,63 @@ function Backlog() {
     ? `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/backlog`
     : null;
 
-useEffect(() => {
-  if (!projectId || !API_URL) return; // ✅ safe check inside hook
+    // -------------------- EFFECTS --------------------
 
-  const fetchTasks = async () => {
+    // Project name fetch
+  useEffect(() => {
+    if (!projectId) return;
+    axios.get(`${process.env.REACT_APP_API_URL}/api/project/${projectId}`)
+        .then(res => setProjectName(res.data.name))
+        .catch(() => setProjectName("Unknown Project"));
+  }, [projectId]);
+
+
+  useEffect(() => {
+    if (!projectId || !API_URL) return; // ✅ safe check inside hook
+
+    const fetchTasks = async () => {
+      try {
+        const response = await axios.get(API_URL);
+        setTasks(response.data);
+      } catch (err) {
+        setError(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTasks();
+  }, [projectId, API_URL]);
+
+  // then conditionally render UI (but AFTER hooks)
+  if (!projectId) {
+    return <div>No project selected. Please go back to your projects.</div>;
+  }
+
+ // -------------------- HANDLERS invite --------------------
+
+  const handleInvite = async () => {
+    const email = window.prompt("Enter a Teamworks account email to invite:");
+    if (!email) return;
+
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed.includes("@")) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+
     try {
-      const response = await axios.get(API_URL);
-      setTasks(response.data);
+      const { data } = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/invite`,
+        { emails: [trimmed] } // ✅ only one email each time
+      );
+      setPendingInvites(data.pendingInvites || []);
+      alert(`${trimmed} added to pending invites.`);
     } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
+      console.error("Invite error:", err.response?.data || err.message);
+      alert(err.response?.data?.error || "Failed to send invite.");
     }
   };
-
-  fetchTasks();
-}, [projectId, API_URL]);
-
-// then conditionally render UI (but AFTER hooks)
-if (!projectId) {
-  return <div>No project selected. Please go back to your projects.</div>;
-}
-
 
   // -------------------- HANDLERS --------------------
   const handleAddTask = async (newTask) => {
@@ -146,6 +193,22 @@ if (!projectId) {
             showForm || showTaskForm ? "col-lg-7 col-md-12" : "col-12"
           }
         >
+          <h2 className="mb-4 text-center">{projectName}</h2>
+          {/* Controls */}
+          <div className="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              {/* Optional: show pending invites */}
+              <small className="text-muted">
+                Pending invites: {pendingInvites.map(p => p.email).join(", ") || "—"}
+              </small>
+            </div>
+            <div>
+              <button className="btn btn-outline-secondary me-2" onClick={handleInvite}>
+                Invite Members
+              </button>
+            </div>
+          </div>
+
           <table className="table table-striped table-hover">
             <thead>
               <tr>
