@@ -61,7 +61,7 @@ def get_project(project_id):
         "members": [str(m) for m in p.get("members", [])],
     })
 
-#-------------------- Owner/auth helpers--------------------
+# -------------------- Owner/auth helpers--------------------
 def get_request_user_id():
     uid = request.headers.get("X-User-Id")
     try:
@@ -69,19 +69,23 @@ def get_request_user_id():
     except Exception:
         return None
 
+
 def require_project_owner(fn):
     @wraps(fn)
     def wrapper(project_id, *args, **kwargs):
         user_id = get_request_user_id()
         if not user_id:
             return jsonify({"error": "Missing X-User-Id header"}), 401
-        proj = get_projects_collection().find_one({"_id": ObjectId(project_id)}, {"createdBy": 1})
+        proj = get_projects_collection().find_one(
+            {"_id": ObjectId(project_id)}, {"createdBy": 1, "owner": 1}
+        )
         if not proj:
             return jsonify({"error": "Project not found"}), 404
-        if str(proj["createdBy"]) != str(user_id):
+        if str(proj.get("createdBy")) != str(user_id) and str(proj.get("owner")) != str(user_id):
             return jsonify({"error": "Only the project owner can invite"}), 403
         request._request_user_id = user_id
         return fn(project_id, *args, **kwargs)
+
     return wrapper
 
 
@@ -156,6 +160,7 @@ def invite_members(project_id):
 
 # -------------------- CHANGE PROJECT NAME ------------------
 @app.route("/api/projects/<project_id>/name", methods=["PUT"])
+@require_project_owner
 def change_name(project_id):
     data = request.json
     new_project_name = data.get("projectName")  # get new project name
@@ -178,6 +183,7 @@ def change_name(project_id):
 
 # -------------------- CHANGE PROJECT OWNER ------------------
 @app.route("/api/projects/<project_id>/owner", methods=["PUT"])
+@require_project_owner
 def change_owner(project_id):
     data = request.json
     # get new project name from front-end form field, not through url params
@@ -214,6 +220,7 @@ def change_owner(project_id):
 
 # -------------------- DELETE PROJECT --------------------
 @app.route("/api/projects/<project_id>", methods=["DELETE"])
+@require_project_owner
 def delete_project(project_id):
        
     try:
