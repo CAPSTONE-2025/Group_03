@@ -419,6 +419,23 @@ def delete_task(project_id, task_id):
 #         return jsonify({"error": "Task not found"}), 404
 #     return jsonify({"message": "Task deleted successfully"})
 
+# -------------------- GET USERS ROUTE -------------------- For getting user emails to change ownership
+@app.route('/api/users', methods=['GET'])
+def get_users_list():    
+    try:
+        users_collection = get_users_collection()
+        users = []
+        for user in users_collection.find({}, {"_id": 1, "email": 1, "firstName": 1, "lastName": 1}):
+            users.append({
+                "id": str(user["_id"]),
+                "email": user["email"],
+                "name": f"{user.get('firstName','')} {user.get('lastName','')}".strip()
+            })
+        return jsonify(users), 200
+
+    except Exception as e:
+        app.logger.error(f"Error getting users: {e}")
+        return jsonify({"error": "An error occurred while getting users."}), 500
 # -------------------- USER AUTH ROUTES --------------------
 
 @app.route('/api/users', methods=['POST'])

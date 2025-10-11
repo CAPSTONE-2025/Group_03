@@ -6,7 +6,28 @@ import { Button } from "bootstrap/dist/js/bootstrap.bundle.min";
 function HomePage({ projs, user }) {
   const [projects, setProjects] = useState(projs || []);
   const [projectNameInput, setProjectNameInput] = useState("");
+  const [users, setUsers] = useState([]);
+  // const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedOwners, setSelectedOwners] = useState({}); // { projectId: userId }
 
+  const handleChangeOwner = async (projectId, user) => {
+      const selectedUserId = selectedOwners[projectId];
+      if (!selectedUserId) return alert("Select a user first");
+
+
+    try {
+      const selectedUser = users.find((u) => u.id === selectedUserId);
+      await axios.put(
+        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/owner`,
+        { ownerEmail: selectedUser.email },
+        { headers: { "X-User-Id": user.id } }
+      );
+      alert("Project ownership updated!");
+    } catch (err) {
+      console.error("Failed to change owner", err);
+      alert("Failed to change owner");
+    }
+  };
 
   const handleDelete = async (projectId, user) => {
     try {
@@ -19,7 +40,6 @@ function HomePage({ projs, user }) {
         }
       );
       alert("Project deleted");
-      
     } catch (err) {
       console.error("Failed to delete project", err);
       alert("Failed to delete project");
@@ -27,7 +47,7 @@ function HomePage({ projs, user }) {
     // re-fetch to update state
     try {
       let result = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`,
+        `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
       );
       setProjects(result.data); // update UI
     } catch (err) {
@@ -40,10 +60,10 @@ function HomePage({ projs, user }) {
     try {
       await axios.put(
         `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/name`,
-        { projectName: projName }, // <-- this sends the projectName in the body
+        { projectName: projName },
         {
           headers: {
-            "X-User-Id": user.id, // if your backend expects this header for owner check
+            "X-User-Id": user.id, // backend expects this header for owner check
           },
         }
       );
@@ -77,6 +97,18 @@ function HomePage({ projs, user }) {
         console.error("Failed to fetch projects", err);
       }
     };
+    // so you can select a user to change ownership to
+    const fetchUsers = async () => {
+      try {
+        const res = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/users`
+        );
+        setUsers(res.data);
+      } catch (err) {
+        console.error("Failed to fetch users", err);
+      }
+    };
+    fetchUsers();
 
     fetchProjects();
   }, [user]);
@@ -98,6 +130,27 @@ function HomePage({ projs, user }) {
             Change Name
           </button>
           <button onClick={() => handleDelete(project.id, user)}>Delete</button>
+
+          <label>Change Project Owner:</label>
+          <select
+            value={selectedOwners[project.id] || ""}
+            onChange={(e) =>
+              setSelectedOwners({
+                ...selectedOwners,
+                [project.id]: e.target.value,
+              })
+            }
+          >
+            <option value="">-- Select User --</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.email}
+              </option>
+            ))}
+          </select>
+          <button onClick={() => handleChangeOwner(project.id, user)}>
+            Change Owner
+          </button>
         </div>
       ))}
     </div>
