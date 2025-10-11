@@ -222,14 +222,17 @@ def change_owner(project_id):
 @app.route("/api/projects/<project_id>", methods=["DELETE"])
 @require_project_owner
 def delete_project(project_id):
-       
+
     try:
         result = get_projects_collection().delete_one(
             {"_id": ObjectId(project_id)},  # set new project name
         )
     except Exception:
-        return jsonify({"error": "Invalid project ID"}), 404
-  
+        return jsonify({"error": "Invalid project ID"}), 400
+
+    if result.deleted_count == 0:
+        return jsonify({"error": "Project not found"}), 404
+
     return jsonify({"message": "Project deleted"}), 200
 
 
