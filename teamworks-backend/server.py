@@ -24,6 +24,7 @@ def create_project():
         "name": data["name"],
         "description": data.get("description", ""),
         "createdBy": ObjectId(data["createdBy"]),
+        "owner": ObjectId(data["createdBy"]),  
         "members": [ObjectId(data["createdBy"])],
         "pendingInvites": [],
         "createdAt": datetime.now(),
@@ -42,6 +43,7 @@ def list_user_projects(user_id):
             "name": p["name"],
             "description": p.get("description", ""),
             "createdBy": str(p["createdBy"]),
+            "owner": str(p["owner"]) if p.get("owner") else None, 
             "members": [str(member) for member in p["members"]],
             "createdAt": p["createdAt"].isoformat() if isinstance(p["createdAt"], datetime) else str(p["createdAt"]),
             "updatedAt": p["updatedAt"].isoformat() if isinstance(p["updatedAt"], datetime) else str(p["updatedAt"]),
@@ -57,7 +59,8 @@ def get_project(project_id):
         "id": str(p["_id"]),
         "name": p.get("name", ""),
         "description": p.get("description", ""),
-        "createdBy": str(p["createdBy"]),
+        "createdBy": str(p.get("createdBy")) if p.get("createdBy") else None,
+        "owner": str(p.get("owner")) if p.get("owner") else None,
         "members": [str(m) for m in p.get("members", [])],
     })
 
@@ -77,11 +80,11 @@ def require_project_owner(fn):
         if not user_id:
             return jsonify({"error": "Missing X-User-Id header"}), 401
         proj = get_projects_collection().find_one(
-            {"_id": ObjectId(project_id)}, {"createdBy": 1, "owner": 1}
+            {"_id": ObjectId(project_id)}, { "owner": 1}
         )
         if not proj:
             return jsonify({"error": "Project not found"}), 404
-        if str(proj.get("createdBy")) != str(user_id) and str(proj.get("owner")) != str(user_id):
+        if str(proj.get("owner")) != str(user_id):
             return jsonify({"error": "Only the project owner can invite"}), 403
         request._request_user_id = user_id
         return fn(project_id, *args, **kwargs)
@@ -187,13 +190,13 @@ def change_name(project_id):
 def change_owner(project_id):
     data = request.json
     # get new project name from front-end form field, not through url params
-    new_owner = data.get("ownerEmail") 
-    if not new_owner:
+    new_owner_email = data.get("ownerEmail") 
+    if not new_owner_email:
         return jsonify({"error": "owner is required"}), 400
 
     try:
         user = get_users_collection().find_one(
-            {"email": new_owner},          
+            {"email": new_owner_email},          
         )
     except Exception:
         return jsonify({"error": "User not found"}), 404
@@ -204,7 +207,7 @@ def change_owner(project_id):
             {
                 "$set": {
                     "owner": ObjectId(user["_id"]),
-                    "ownerEmail": new_owner,
+                    "ownerEmail": new_owner_email,
                 },  # set new owner
                 "$addToSet": {"members": ObjectId(user["_id"])},
             },

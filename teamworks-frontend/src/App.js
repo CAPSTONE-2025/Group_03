@@ -15,7 +15,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import { AuthProvider, useAuth } from './contexts/AuthContext'; 
 import axios from "axios";
-
+import { useCallback } from 'react';
 function AppContent() {
   const { isAuthenticated, user, handleLogout } = useAuth();
   const [projects, setProjects] = useState([]);
@@ -23,8 +23,8 @@ function AppContent() {
   const [newProjectName, setNewProjectName] = useState("");
 
   // ✅ Fetch only projects where logged-in user is a member
-  useEffect(() => {
-    const fetchProjects = async () => {
+  
+    const fetchProjects = useCallback (async () => {
       try {
         const res = await axios.get(
           `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
@@ -34,12 +34,13 @@ function AppContent() {
       } catch (err) {
         console.error("Failed to fetch projects", err);
       }
-    };
+    }, [isAuthenticated, user?.id]);
 
-    if (isAuthenticated && user) {
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
       fetchProjects();
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user?.id, fetchProjects]);
 
   const handleLogoutClick = () => {
     handleLogout();
@@ -132,13 +133,13 @@ function AppContent() {
                 {/* Main content */}
                 <div className="flex-grow-1 container mt-4">
                   <Routes>
-                    <Route path="/home" element={<HomePage projs={projects} user={user} />} />
+                    <Route path="/home" element={<HomePage projs={projects} user={user} refreshProjects={fetchProjects} />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/projects/:projectId/calendar" element={<CalendarPage />} />
                     <Route path="/projects/:projectId/backlog" element={<BacklogPage />} />
                     <Route path="/projects/:projectId/kanbanboard" element={<KanbanBoardPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
-                    <Route path="/" element={<HomePage projs={projects} user={user} />} />
+                    <Route path="/" element={<HomePage projs={projects} user={user} refreshProjects={fetchProjects}/>} />
                   </Routes>
                 </div>
 
