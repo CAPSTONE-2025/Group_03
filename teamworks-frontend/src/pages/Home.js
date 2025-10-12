@@ -1,26 +1,158 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
+import { AuthProvider, useAuth } from "../contexts/AuthContext";
+import axios from "axios";
+import { Button } from "bootstrap/dist/js/bootstrap.bundle.min";
 
-function HomePage() {
-  const [message, setMessage] = useState('');
+function HomePage({ projs, user }) {
+  const [projects, setProjects] = useState(projs || []);
+  const [projectNameInput, setProjectNameInput] = useState("");
+  const [users, setUsers] = useState([]);
+  // const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedOwners, setSelectedOwners] = useState({}); // { projectId: userId }
+
+  const handleChangeOwner = async (projectId, user) => {
+      const selectedUserId = selectedOwners[projectId];
+      if (!selectedUserId) return alert("Select a user first");
+
+
+    try {
+      const selectedUser = users.find((u) => u.id === selectedUserId);
+      await axios.put(
+        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/owner`,
+        { ownerEmail: selectedUser.email },
+        { headers: { "X-User-Id": user.id } }
+      );
+      alert("Project ownership updated!");
+    } catch (err) {
+      console.error("Failed to change owner", err);
+      alert("Failed to change owner");
+    }
+  };
+
+  const handleDelete = async (projectId, user) => {
+    try {
+      await axios.delete(
+        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}`,
+        {
+          headers: {
+            "X-User-Id": user.id, // backend expects this header for owner check
+          },
+        }
+      );
+      alert("Project deleted");
+    } catch (err) {
+      console.error("Failed to delete project", err);
+      alert("Failed to delete project");
+    }
+    // re-fetch to update state
+    try {
+      let result = await axios.get(
+        `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
+      );
+      setProjects(result.data); // update UI
+    } catch (err) {
+      console.error("Failed to fetch projects and update state", err);
+      alert("Failed to fetch projects and update state");
+    }
+  };
+
+  const handleNameChange = async (projectId, projName) => {
+    try {
+      await axios.put(
+        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/name`,
+        { projectName: projName },
+        {
+          headers: {
+            "X-User-Id": user.id, // backend expects this header for owner check
+          },
+        }
+      );
+      alert("Project name changed");
+    } catch (err) {
+      console.error("Failed to update project name", err);
+      alert("Failed to update project name");
+    }
+
+    // re-fetch to update state
+    try {
+      let result = await axios.get(
+        `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
+      );
+      setProjects(result.data); // update UI
+    } catch (err) {
+      console.error("Failed to fetch projects and update state", err);
+      alert("Failed to fetch projects and update state");
+    }
+  };
 
   useEffect(() => {
-    const fetchHomeMessage = async () => {
+    const fetchProjects = async () => {
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/`);
-        const data = await response.json();
-        setMessage(data.message);
-      } catch (error) {
-        console.error('Error fetching data:', error);
+        const res = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
+        );
+        console.log(res.data);
+        setProjects(res.data);
+      } catch (err) {
+        console.error("Failed to fetch projects", err);
       }
     };
+    // so you can select a user to change ownership to
+    const fetchUsers = async () => {
+      try {
+        const res = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/users`
+        );
+        setUsers(res.data);
+      } catch (err) {
+        console.error("Failed to fetch users", err);
+      }
+    };
+    fetchUsers();
 
-    fetchHomeMessage();
-  }, []);
+    fetchProjects();
+  }, [user]);
 
   return (
     <div className="container mt-4">
       <h1 className="text-center">Home Page</h1>
-      <p className="text-center">{message}</p>
+      {projects.map((project) => (
+        <div key={project.id}>
+          <span>{project.name}</span>
+          <input
+            type="text"
+            placeholder="New name"
+            onChange={(e) => setProjectNameInput(e.target.value)}
+          />
+          <button
+            onClick={() => handleNameChange(project.id, projectNameInput)}
+          >
+            Change Name
+          </button>
+          <button onClick={() => handleDelete(project.id, user)}>Delete</button>
+
+          <label>Change Project Owner:</label>
+          <select
+            value={selectedOwners[project.id] || ""}
+            onChange={(e) =>
+              setSelectedOwners({
+                ...selectedOwners,
+                [project.id]: e.target.value,
+              })
+            }
+          >
+            <option value="">-- Select User --</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.email}
+              </option>
+            ))}
+          </select>
+          <button onClick={() => handleChangeOwner(project.id, user)}>
+            Change Owner
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

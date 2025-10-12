@@ -29,6 +29,7 @@ function AppContent() {
         const res = await axios.get(
           `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
         );
+        console.log(res.data)
         setProjects(res.data);
       } catch (err) {
         console.error("Failed to fetch projects", err);
@@ -131,19 +132,19 @@ function AppContent() {
                 {/* Main content */}
                 <div className="flex-grow-1 container mt-4">
                   <Routes>
-                    <Route path="/home" element={<HomePage />} />
+                    <Route path="/home" element={<HomePage projs={projects} user={user} />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/projects/:projectId/calendar" element={<CalendarPage />} />
                     <Route path="/projects/:projectId/backlog" element={<BacklogPage />} />
                     <Route path="/projects/:projectId/kanbanboard" element={<KanbanBoardPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
-                    <Route path="/" element={<HomePage />} />
+                    <Route path="/" element={<HomePage projs={projects} user={user} />} />
                   </Routes>
                 </div>
 
                 {/* Footer */}
                 <footer className="footer bg-light text-center py-3 mt-auto">
-                  <small>&copy; {new Date().getFullYear()} TeamWorks. Seongjun, Jimbert, Gary.</small>
+                  <small>&copy; {new Date().getFullYear()} TeamWorks. Seongjun, Jimbert, Gary, Fawad.</small>
                 </footer>
               </div>
             }

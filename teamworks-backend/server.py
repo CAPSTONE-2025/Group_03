@@ -61,7 +61,7 @@ def get_project(project_id):
         "members": [str(m) for m in p.get("members", [])],
     })
 
-#-------------------- Owner/auth helpers--------------------
+# -------------------- Owner/auth helpers--------------------
 def get_request_user_id():
     uid = request.headers.get("X-User-Id")
     try:
@@ -69,19 +69,23 @@ def get_request_user_id():
     except Exception:
         return None
 
+
 def require_project_owner(fn):
     @wraps(fn)
     def wrapper(project_id, *args, **kwargs):
         user_id = get_request_user_id()
         if not user_id:
             return jsonify({"error": "Missing X-User-Id header"}), 401
-        proj = get_projects_collection().find_one({"_id": ObjectId(project_id)}, {"createdBy": 1})
+        proj = get_projects_collection().find_one(
+            {"_id": ObjectId(project_id)}, {"createdBy": 1, "owner": 1}
+        )
         if not proj:
             return jsonify({"error": "Project not found"}), 404
-        if str(proj["createdBy"]) != str(user_id):
+        if str(proj.get("createdBy")) != str(user_id) and str(proj.get("owner")) != str(user_id):
             return jsonify({"error": "Only the project owner can invite"}), 403
         request._request_user_id = user_id
         return fn(project_id, *args, **kwargs)
+
     return wrapper
 
 
@@ -152,6 +156,84 @@ def invite_members(project_id):
         for pi in proj2.get("pendingInvites", [])
     ]
     return jsonify({"pendingInvites": pending_serialized}), 200
+
+
+# -------------------- CHANGE PROJECT NAME ------------------
+@app.route("/api/projects/<project_id>/name", methods=["PUT"])
+@require_project_owner
+def change_name(project_id):
+    data = request.json
+    new_project_name = data.get("projectName")  # get new project name
+    if not new_project_name:
+        return jsonify({"error": "projectName is required"}), 400
+
+    try:
+        result = get_projects_collection().update_one(
+            {"_id": ObjectId(project_id), "name": {"$exists": True}},
+            {"$set": {"name": new_project_name}},  # set new project name
+        )
+    except Exception:
+        return jsonify({"error": "Invalid project ID"}), 404
+
+    if result.modified_count == 0:
+        return jsonify({"error": "Project name already set"}), 304  # 304 (Not Modified)
+
+    return jsonify({"message": "Project name updated"}), 200
+
+
+# -------------------- CHANGE PROJECT OWNER ------------------
+@app.route("/api/projects/<project_id>/owner", methods=["PUT"])
+@require_project_owner
+def change_owner(project_id):
+    data = request.json
+    # get new project name from front-end form field, not through url params
+    new_owner = data.get("ownerEmail") 
+    if not new_owner:
+        return jsonify({"error": "owner is required"}), 400
+
+    try:
+        user = get_users_collection().find_one(
+            {"email": new_owner},          
+        )
+    except Exception:
+        return jsonify({"error": "User not found"}), 404
+
+    try:
+        result = get_projects_collection().update_one(
+            {"_id": ObjectId(project_id)},
+            {
+                "$set": {
+                    "owner": ObjectId(user["_id"]),
+                    "ownerEmail": new_owner,
+                },  # set new owner
+                "$addToSet": {"members": ObjectId(user["_id"])},
+            },
+        )
+    except Exception:
+        return jsonify({"error": "Cannot update owner with new owner"}), 404
+
+    if result.modified_count == 0:
+        return jsonify({"error": "Owner already owns project"}), 304  # 304 (Not Modified)
+
+    return jsonify({"message": "Project owner updated"}), 200
+
+
+# -------------------- DELETE PROJECT --------------------
+@app.route("/api/projects/<project_id>", methods=["DELETE"])
+@require_project_owner
+def delete_project(project_id):
+
+    try:
+        result = get_projects_collection().delete_one(
+            {"_id": ObjectId(project_id)},  # set new project name
+        )
+    except Exception:
+        return jsonify({"error": "Invalid project ID"}), 400
+
+    if result.deleted_count == 0:
+        return jsonify({"error": "Project not found"}), 404
+
+    return jsonify({"message": "Project deleted"}), 200
 
 
 # -------------------- BACKLOG ROUTES --------------------
@@ -234,14 +316,24 @@ def create_project_backlog(project_id):
     return jsonify({"message": "Task created", "id": str(result.inserted_id)}), 201
 
 
-@app.route('/api/projects/<project_id>/backlog/<task_id>', methods=['PUT'])
+@app.route("/api/projects/<project_id>/backlog/<task_id>", methods=["PUT"])
 def update_task(project_id, task_id):
     data = request.json
-    task = backlog_collection.find_one({"_id": ObjectId(task_id), "projectId": ObjectId(project_id)})
+    task = backlog_collection.find_one(
+        {"_id": ObjectId(task_id), "projectId": ObjectId(project_id)}
+    )
     if not task:
         return jsonify({"error": "Task not found"}), 404
 
-    allowed_fields = ["title", "description", "label", "status", "priority", "assignedTo", "dueDate"]
+    allowed_fields = [
+        "title",
+        "description",
+        "label",
+        "status",
+        "priority",
+        "assignedTo",
+        "dueDate",
+    ]
     update = {field: data[field] for field in allowed_fields if field in data}
 
     if not update:
@@ -251,9 +343,11 @@ def update_task(project_id, task_id):
     return jsonify({"message": "Task updated successfully"})
 
 
-@app.route('/api/projects/<project_id>/backlog/<task_id>', methods=['DELETE'])
+@app.route("/api/projects/<project_id>/backlog/<task_id>", methods=["DELETE"])
 def delete_task(project_id, task_id):
-    result = backlog_collection.delete_one({"_id": ObjectId(task_id), "projectId": ObjectId(project_id)})
+    result = backlog_collection.delete_one(
+        {"_id": ObjectId(task_id), "projectId": ObjectId(project_id)}
+    )
     if result.deleted_count == 0:
         return jsonify({"error": "Task not found"}), 404
     return jsonify({"message": "Task deleted successfully"})
@@ -325,6 +419,23 @@ def delete_task(project_id, task_id):
 #         return jsonify({"error": "Task not found"}), 404
 #     return jsonify({"message": "Task deleted successfully"})
 
+# -------------------- GET USERS ROUTE -------------------- For getting user emails to change ownership
+@app.route('/api/users', methods=['GET'])
+def get_users_list():    
+    try:
+        users_collection = get_users_collection()
+        users = []
+        for user in users_collection.find({}, {"_id": 1, "email": 1, "firstName": 1, "lastName": 1}):
+            users.append({
+                "id": str(user["_id"]),
+                "email": user["email"],
+                "name": f"{user.get('firstName','')} {user.get('lastName','')}".strip()
+            })
+        return jsonify(users), 200
+
+    except Exception as e:
+        app.logger.error(f"Error getting users: {e}")
+        return jsonify({"error": "An error occurred while getting users."}), 500
 # -------------------- USER AUTH ROUTES --------------------
 
 @app.route('/api/users', methods=['POST'])
@@ -359,6 +470,7 @@ def create_user():
     except Exception as e:
         app.logger.error(f"Error during signup: {e}")
         return jsonify({"error": "An error occurred during signup."}), 500
+
 
 @app.route('/api/users/login', methods=['POST'])
 def login_user():
