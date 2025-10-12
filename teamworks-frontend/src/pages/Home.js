@@ -4,13 +4,34 @@ import axios from "axios";
 function HomePage({ projs, user, refreshProjects }) {
   const projects = projs || [];
   const [users, setUsers] = useState([]);
-  const [selectedOwners, setSelectedOwners] = useState({}); // { [projectId]: userId }
-  const [nameEdits, setNameEdits] = useState({}); // { [projectId]: "new name" }
+  const [selectedOwners, setSelectedOwners] = useState({});
+  const [nameEdits, setNameEdits] = useState({});
+
+  // ✅ Fetch users list once
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/users`);
+        setUsers(res.data);
+      } catch (err) {
+        console.error("Failed to fetch users", err);
+      }
+    })();
+  }, []);
 
   const handleChangeOwner = async (projectId) => {
     const selectedUserId = selectedOwners[projectId];
     if (!selectedUserId) return alert("Select a user first");
-    const selectedUser = users.find((u) => u.id === selectedUserId);
+
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return alert("Project not found");
+
+    const memberIds = (project.members || []).map(String);
+    if (!memberIds.includes(String(selectedUserId))) {
+      return alert("Selected user must be a member of this project");
+    }
+
+    const selectedUser = users.find((u) => String(u.id) === String(selectedUserId));
     if (!selectedUser) return alert("Selected user not found");
 
     try {
@@ -20,8 +41,7 @@ function HomePage({ projs, user, refreshProjects }) {
         { headers: { "X-User-Id": user.id } }
       );
       alert("Project ownership updated!");
-      // If you show owner badges anywhere, refresh parent too:
-      await refreshProjects();
+      await refreshProjects(); // 🔁 update navbar + list
     } catch (err) {
       console.error("Failed to change owner", err);
       const msg =
@@ -42,7 +62,6 @@ function HomePage({ projs, user, refreshProjects }) {
         { headers: { "X-User-Id": user.id } }
       );
       alert("Project deleted");
-      // ✅ Update parent (navbar) immediately
       await refreshProjects();
     } catch (err) {
       console.error("Failed to delete project", err);
@@ -64,13 +83,11 @@ function HomePage({ projs, user, refreshProjects }) {
     try {
       await axios.put(
         `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/name`,
-        { projectName: newName }, // or { name: newName } if you changed backend
+        { projectName: newName },
         { headers: { "X-User-Id": user.id } }
       );
       alert("Project name changed");
-      // ✅ Update parent (navbar) immediately
       await refreshProjects();
-      // clear the input for that project
       setNameEdits((prev) => ({ ...prev, [projectId]: "" }));
     } catch (err) {
       console.error("Failed to update project name", err);
@@ -85,70 +102,75 @@ function HomePage({ projs, user, refreshProjects }) {
     }
   };
 
-  useEffect(() => {
-    // populate users list for owner change
-    (async () => {
-      try {
-        const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/users`);
-        setUsers(res.data);
-      } catch (err) {
-        console.error("Failed to fetch users", err);
-      }
-    })();
-  }, []);
-
+  // ✅ UI rendering section
   return (
     <div className="container mt-4">
       <h1 className="text-center">Home Page</h1>
-      {projects.map((project) => (
-        <div key={project.id} className="mb-3">
-          <span className="me-2 fw-semibold">{project.name}</span>
 
-          <input
-            type="text"
-            placeholder="New name"
-            value={nameEdits[project.id] ?? ""}
-            onChange={(e) =>
-              setNameEdits((prev) => ({ ...prev, [project.id]: e.target.value }))
-            }
-            className="form-control d-inline-block w-auto me-2"
-          />
-          <button
-            className="btn btn-sm btn-primary me-2"
-            onClick={() => handleNameChange(project.id)}
-          >
-            Change Name
-          </button>
-          <button
-            className="btn btn-sm btn-outline-danger me-3"
-            onClick={() => handleDelete(project.id)}
-          >
-            Delete
-          </button>
+      {projects.map((project) => {
+        // only members for this project
+        const memberIds = (project.members || []).map(String);
+        const memberUsers = users.filter((u) =>
+          memberIds.includes(String(u.id))
+        );
 
-          <label className="me-2">Change Project Owner:</label>
-          <select
-            className="form-select d-inline-block w-auto me-2"
-            value={selectedOwners[project.id] || ""}
-            onChange={(e) =>
-              setSelectedOwners((prev) => ({ ...prev, [project.id]: e.target.value }))
-            }
-          >
-            <option value="">-- Select User --</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.email}
-              </option>
-            ))}
-          </select>
-          <button
-            className="btn btn-sm btn-outline-secondary"
-            onClick={() => handleChangeOwner(project.id)}
-          >
-            Change Owner
-          </button>
-        </div>
-      ))}
+        return (
+          <div key={project.id} className="mb-3">
+            <span className="me-2 fw-semibold">{project.name}</span>
+
+            <input
+              type="text"
+              placeholder="New name"
+              value={nameEdits[project.id] ?? ""}
+              onChange={(e) =>
+                setNameEdits((prev) => ({
+                  ...prev,
+                  [project.id]: e.target.value,
+                }))
+              }
+              className="form-control d-inline-block w-auto me-2"
+            />
+            <button
+              className="btn btn-sm btn-primary me-2"
+              onClick={() => handleNameChange(project.id)}
+            >
+              Change Name
+            </button>
+            <button
+              className="btn btn-sm btn-outline-danger me-3"
+              onClick={() => handleDelete(project.id)}
+            >
+              Delete
+            </button>
+
+            <label className="me-2">Change Project Owner:</label>
+            <select
+              className="form-select d-inline-block w-auto me-2"
+              value={selectedOwners[project.id] || ""}
+              onChange={(e) =>
+                setSelectedOwners((prev) => ({
+                  ...prev,
+                  [project.id]: e.target.value,
+                }))
+              }
+            >
+              <option value="">-- Select Member --</option>
+              {memberUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.email}
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => handleChangeOwner(project.id)}
+              disabled={!selectedOwners[project.id]}
+            >
+              Change Owner
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
