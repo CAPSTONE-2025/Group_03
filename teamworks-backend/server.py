@@ -5,6 +5,7 @@ from model import backlog_collection
 import bcrypt
 from bson import ObjectId
 from datetime import datetime
+from functools import wraps
 
 app = Flask(__name__)
 CORS(app)
@@ -23,7 +24,9 @@ def create_project():
         "name": data["name"],
         "description": data.get("description", ""),
         "createdBy": ObjectId(data["createdBy"]),
+        "owner": ObjectId(data["createdBy"]),  
         "members": [ObjectId(data["createdBy"])],
+        "pendingInvites": [],
         "createdAt": datetime.now(),
         "updatedAt": datetime.now(),
     }
@@ -40,29 +43,200 @@ def list_user_projects(user_id):
             "name": p["name"],
             "description": p.get("description", ""),
             "createdBy": str(p["createdBy"]),
+            "owner": str(p["owner"]) if p.get("owner") else None, 
             "members": [str(member) for member in p["members"]],
             "createdAt": p["createdAt"].isoformat() if isinstance(p["createdAt"], datetime) else str(p["createdAt"]),
             "updatedAt": p["updatedAt"].isoformat() if isinstance(p["updatedAt"], datetime) else str(p["updatedAt"]),
         })
     return jsonify(projects)
 
-# -------------------- PROJECT INVITE ---------------------
-@app.route('/api/projects/<project_id>/invite', methods=['POST'])
-def invite_member(project_id):
-    data = request.json
-    user_id = data.get("userId")  # user being invited
-    if not user_id:
-        return jsonify({"error": "userId is required"}), 400
+@app.route('/api/project/<project_id>', methods=['GET'])
+def get_project(project_id):
+    p = get_projects_collection().find_one({"_id": ObjectId(project_id)})
+    if not p:
+        return jsonify({"error": "Project not found"}), 404
+    return jsonify({
+        "id": str(p["_id"]),
+        "name": p.get("name", ""),
+        "description": p.get("description", ""),
+        "createdBy": str(p.get("createdBy")) if p.get("createdBy") else None,
+        "owner": str(p.get("owner")) if p.get("owner") else None,
+        "members": [str(m) for m in p.get("members", [])],
+    })
 
-    result = get_projects_collection().update_one(
-        {"_id": ObjectId(project_id)},
-        {"$addToSet": {"members": ObjectId(user_id)}}  # prevents duplicates
-    )
+# -------------------- Owner/auth helpers--------------------
+def get_request_user_id():
+    uid = request.headers.get("X-User-Id")
+    try:
+        return ObjectId(uid) if uid else None
+    except Exception:
+        return None
+
+
+def require_project_owner(fn):
+    @wraps(fn)
+    def wrapper(project_id, *args, **kwargs):
+        user_id = get_request_user_id()
+        if not user_id:
+            return jsonify({"error": "Missing X-User-Id header"}), 401
+        proj = get_projects_collection().find_one(
+            {"_id": ObjectId(project_id)}, { "owner": 1}
+        )
+        if not proj:
+            return jsonify({"error": "Project not found"}), 404
+        if str(proj.get("owner")) != str(user_id):
+            return jsonify({"error": "Only the project owner can invite"}), 403
+        request._request_user_id = user_id
+        return fn(project_id, *args, **kwargs)
+
+    return wrapper
+
+
+# -------------------- PROJECT INVITE ---------------------
+# @app.route('/api/projects/<project_id>/invite', methods=['POST'])
+# def invite_member(project_id):
+#     data = request.json
+#     user_id = data.get("userId")  # user being invited
+#     if not user_id:
+#         return jsonify({"error": "userId is required"}), 400
+
+#     result = get_projects_collection().update_one(
+#         {"_id": ObjectId(project_id)},
+#         {"$addToSet": {"members": ObjectId(user_id)}}  # prevents duplicates
+#     )
+
+#     if result.modified_count == 0:
+#         return jsonify({"error": "Project not found or user already a member"}), 404
+
+#     return jsonify({"message": "User invited successfully"}), 200
+
+@app.route('/api/projects/<project_id>/invite', methods=['POST'])
+@require_project_owner
+def invite_members(project_id):
+    data = request.json or {}
+    emails = data.get("emails", [])
+    if not isinstance(emails, list) or not emails:
+        return jsonify({"error": "Provide emails as a non-empty array"}), 400
+
+    # normalize + dedupe
+    normalized = list({(e or "").strip().lower() for e in emails if isinstance(e, str) and e.strip()})
+    if not normalized:
+        return jsonify({"error": "No valid emails provided"}), 400
+
+    projects = get_projects_collection()
+    proj = projects.find_one({"_id": ObjectId(project_id)}, {"pendingInvites": 1})
+    if not proj:
+        return jsonify({"error": "Project not found"}), 404
+
+    # prevent duplicates
+    already = { (pi.get("email") or "").lower() for pi in proj.get("pendingInvites", []) }
+    new_pending = []
+    for email in normalized:
+        if email not in already:
+            new_pending.append({
+                "email": email,
+                "status": "pending",
+                "invitedBy": request._request_user_id,
+                "invitedAt": datetime.utcnow()
+            })
+
+    if new_pending:
+        projects.update_one(
+            {"_id": ObjectId(project_id)},
+            {"$push": {"pendingInvites": {"$each": new_pending}},
+             "$set": {"updatedAt": datetime.utcnow()}}
+        )
+
+    # return fresh pending list
+    proj2 = projects.find_one({"_id": ObjectId(project_id)}, {"pendingInvites": 1})
+    pending_serialized = [
+        {
+            "email": pi.get("email"),
+            "status": pi.get("status", "pending"),
+            "invitedBy": str(pi.get("invitedBy")) if pi.get("invitedBy") else None,
+            "invitedAt": pi.get("invitedAt").isoformat() if isinstance(pi.get("invitedAt"), datetime) else str(pi.get("invitedAt", "")),
+        }
+        for pi in proj2.get("pendingInvites", [])
+    ]
+    return jsonify({"pendingInvites": pending_serialized}), 200
+
+
+# -------------------- CHANGE PROJECT NAME ------------------
+@app.route("/api/projects/<project_id>/name", methods=["PUT"])
+@require_project_owner
+def change_name(project_id):
+    data = request.json
+    new_project_name = data.get("projectName")  # get new project name
+    if not new_project_name:
+        return jsonify({"error": "projectName is required"}), 400
+
+    try:
+        result = get_projects_collection().update_one(
+            {"_id": ObjectId(project_id), "name": {"$exists": True}},
+            {"$set": {"name": new_project_name}},  # set new project name
+        )
+    except Exception:
+        return jsonify({"error": "Invalid project ID"}), 404
 
     if result.modified_count == 0:
-        return jsonify({"error": "Project not found or user already a member"}), 404
+        return jsonify({"error": "Project name already set"}), 304  # 304 (Not Modified)
 
-    return jsonify({"message": "User invited successfully"}), 200
+    return jsonify({"message": "Project name updated"}), 200
+
+
+# -------------------- CHANGE PROJECT OWNER ------------------
+@app.route("/api/projects/<project_id>/owner", methods=["PUT"])
+@require_project_owner
+def change_owner(project_id):
+    data = request.json
+    # get new project name from front-end form field, not through url params
+    new_owner_email = data.get("ownerEmail") 
+    if not new_owner_email:
+        return jsonify({"error": "owner is required"}), 400
+
+    try:
+        user = get_users_collection().find_one(
+            {"email": new_owner_email},          
+        )
+    except Exception:
+        return jsonify({"error": "User not found"}), 404
+
+    try:
+        result = get_projects_collection().update_one(
+            {"_id": ObjectId(project_id)},
+            {
+                "$set": {
+                    "owner": ObjectId(user["_id"]),
+                    "ownerEmail": new_owner_email,
+                },  # set new owner
+                "$addToSet": {"members": ObjectId(user["_id"])},
+            },
+        )
+    except Exception:
+        return jsonify({"error": "Cannot update owner with new owner"}), 404
+
+    if result.modified_count == 0:
+        return jsonify({"error": "Owner already owns project"}), 304  # 304 (Not Modified)
+
+    return jsonify({"message": "Project owner updated"}), 200
+
+
+# -------------------- DELETE PROJECT --------------------
+@app.route("/api/projects/<project_id>", methods=["DELETE"])
+@require_project_owner
+def delete_project(project_id):
+
+    try:
+        result = get_projects_collection().delete_one(
+            {"_id": ObjectId(project_id)},  # set new project name
+        )
+    except Exception:
+        return jsonify({"error": "Invalid project ID"}), 400
+
+    if result.deleted_count == 0:
+        return jsonify({"error": "Project not found"}), 404
+
+    return jsonify({"message": "Project deleted"}), 200
 
 
 # -------------------- BACKLOG ROUTES --------------------
@@ -145,14 +319,24 @@ def create_project_backlog(project_id):
     return jsonify({"message": "Task created", "id": str(result.inserted_id)}), 201
 
 
-@app.route('/api/projects/<project_id>/backlog/<task_id>', methods=['PUT'])
+@app.route("/api/projects/<project_id>/backlog/<task_id>", methods=["PUT"])
 def update_task(project_id, task_id):
     data = request.json
-    task = backlog_collection.find_one({"_id": ObjectId(task_id), "projectId": ObjectId(project_id)})
+    task = backlog_collection.find_one(
+        {"_id": ObjectId(task_id), "projectId": ObjectId(project_id)}
+    )
     if not task:
         return jsonify({"error": "Task not found"}), 404
 
-    allowed_fields = ["title", "description", "label", "status", "priority", "assignedTo", "dueDate"]
+    allowed_fields = [
+        "title",
+        "description",
+        "label",
+        "status",
+        "priority",
+        "assignedTo",
+        "dueDate",
+    ]
     update = {field: data[field] for field in allowed_fields if field in data}
 
     if not update:
@@ -162,9 +346,11 @@ def update_task(project_id, task_id):
     return jsonify({"message": "Task updated successfully"})
 
 
-@app.route('/api/projects/<project_id>/backlog/<task_id>', methods=['DELETE'])
+@app.route("/api/projects/<project_id>/backlog/<task_id>", methods=["DELETE"])
 def delete_task(project_id, task_id):
-    result = backlog_collection.delete_one({"_id": ObjectId(task_id), "projectId": ObjectId(project_id)})
+    result = backlog_collection.delete_one(
+        {"_id": ObjectId(task_id), "projectId": ObjectId(project_id)}
+    )
     if result.deleted_count == 0:
         return jsonify({"error": "Task not found"}), 404
     return jsonify({"message": "Task deleted successfully"})
@@ -236,6 +422,23 @@ def delete_task(project_id, task_id):
 #         return jsonify({"error": "Task not found"}), 404
 #     return jsonify({"message": "Task deleted successfully"})
 
+# -------------------- GET USERS ROUTE -------------------- For getting user emails to change ownership
+@app.route('/api/users', methods=['GET'])
+def get_users_list():    
+    try:
+        users_collection = get_users_collection()
+        users = []
+        for user in users_collection.find({}, {"_id": 1, "email": 1, "firstName": 1, "lastName": 1}):
+            users.append({
+                "id": str(user["_id"]),
+                "email": user["email"],
+                "name": f"{user.get('firstName','')} {user.get('lastName','')}".strip()
+            })
+        return jsonify(users), 200
+
+    except Exception as e:
+        app.logger.error(f"Error getting users: {e}")
+        return jsonify({"error": "An error occurred while getting users."}), 500
 # -------------------- USER AUTH ROUTES --------------------
 
 @app.route('/api/users', methods=['POST'])
@@ -270,6 +473,7 @@ def create_user():
     except Exception as e:
         app.logger.error(f"Error during signup: {e}")
         return jsonify({"error": "An error occurred during signup."}), 500
+
 
 @app.route('/api/users/login', methods=['POST'])
 def login_user():

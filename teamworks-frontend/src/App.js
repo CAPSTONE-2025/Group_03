@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import DashboardHome from './pages/DashboardHome';
@@ -15,10 +15,11 @@ import ProfilePage from "./pages/Profile";
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
-import { AuthProvider, useAuth } from './contexts/AuthContext'; 
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import axios from "axios";
 
 function AppContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, handleLogout } = useAuth();
 
   return (
     <Router>
