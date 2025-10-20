@@ -180,55 +180,8 @@ const DashboardCalendar = () => {
   return (
     <React.Fragment>
     <div className="d-flex flex-column min-vh-100">
-      {/* Top Navigation Bar */}
-      <nav className="navbar navbar-expand-lg navbar-light bg-light">
-        <div className="container">
-          <Link className="navbar-brand" to="/">TeamWorks</Link>
-          <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span className="navbar-toggler-icon"></span>
-          </button>
-          <div className="collapse navbar-collapse" id="navbarNav">
-            <ul className="navbar-nav me-auto">
-              <li className="nav-item"><Link className="nav-link" to="/">Home</Link></li>
-              <li className="nav-item"><Link className="nav-link" to="/my-work">My Work</Link></li>
-              <li className="nav-item"><Link className="nav-link" to="/calendar">Calendar</Link></li>
-              <li className="nav-item"><Link className="nav-link" to="/about">About</Link></li>
 
-              {/* Projects dropdown */}
-              <li className="nav-item dropdown">
-                <a className="nav-link dropdown-toggle" href="/" id="projectsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  Projects
-                </a>
-                <ul className="dropdown-menu" aria-labelledby="projectsDropdown">
-                  {projects.map((project) => (
-                    <li key={project.id} className="dropdown-submenu">
-                      <a
-                        className="dropdown-item dropdown-toggle"
-                        href="#"
-                        onClick={(e) => e.preventDefault()}
-                      >
-                        {project.name}
-                      </a>
-                      <ul className="dropdown-menu">
-                        <li><Link className="dropdown-item" to={`/projects/${project.id}/backlog`}>Backlog</Link></li>
-                        <li><Link className="dropdown-item" to={`/projects/${project.id}/kanbanboard`}>Kanban</Link></li>
-                        <li><Link className="dropdown-item" to={`/projects/${project.id}/calendar`}>Calendar</Link></li>
-                      </ul>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            </ul>
-          </div>
-          <div className="d-flex align-items-center">
-            <Link className="nav-link me-3" to="/profile"><i className="bi bi-person fs-5"></i></Link>
-            <button className="btn btn-link nav-link p-0" onClick={() => {
-              localStorage.removeItem("user");
-              window.location.href = '/welcome';
-            }}><i className="bi bi-box-arrow-right fs-5"></i></button>
-          </div>
-        </div>
-      </nav>
+
 
       {/* Main Content */}
       <div className="flex-grow-1 container mt-4">

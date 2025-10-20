@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import AppLayout from "./layouts/AppLayout";
 import DashboardHome from './pages/DashboardHome';
 import DashboardCalendar from './components/DashboardCalendar';
 import AboutPage from './pages/About';
@@ -46,7 +47,7 @@ function AppContent() {
 
         {/* Protected pages */}
         {isAuthenticated ? (
-          <>
+          <Route element={<AppLayout />}>
             <Route path="/" element={<DashboardHome />} />
             <Route path="/home" element={<DashboardHome />} />
             <Route path="/calendar" element={<DashboardCalendar />} />
@@ -56,7 +57,7 @@ function AppContent() {
             <Route path="/projects/:projectId/kanbanboard" element={<KanbanBoardPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="*" element={<Navigate to="/" />} />
-          </>
+          </Route>
         ) : (
           <Route path="*" element={<Navigate to="/welcome" />} />
         )}
