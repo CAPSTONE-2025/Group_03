@@ -3,7 +3,6 @@ import './App.css';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import DashboardHome from './pages/DashboardHome';
 import DashboardCalendar from './components/DashboardCalendar';
-import MyWork from './pages/MyWork';
 import AboutPage from './pages/About';
 import CalendarPage from './pages/Calendar';
 import BacklogPage from './pages/Backlog';
@@ -19,7 +18,23 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import axios from "axios";
 
 function AppContent() {
-  const { isAuthenticated, user, handleLogout } = useAuth();
+  const { isAuthenticated, user, handleLogout, isLoading } = useAuth();
+  
+  console.log("AppContent render - isAuthenticated:", isAuthenticated, "user:", user, "isLoading:", isLoading);
+
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <div className="text-center">
+          <div className="spinner-border text-primary mb-3" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>
@@ -34,7 +49,6 @@ function AppContent() {
           <>
             <Route path="/" element={<DashboardHome />} />
             <Route path="/home" element={<DashboardHome />} />
-            <Route path="/my-work" element={<MyWork />} />
             <Route path="/calendar" element={<DashboardCalendar />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/projects/:projectId/calendar" element={<CalendarPage />} />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const ProjectCard = ({ project, onSelectProject }) => {
+const ProjectCard = ({ project, onSelectProject, onEditProject, onDeleteProject }) => {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'active': return 'success';
@@ -56,14 +56,26 @@ const ProjectCard = ({ project, onSelectProject }) => {
                 <i className="bi bi-three-dots-vertical text-muted"></i>
               </button>
               <ul className="dropdown-menu dropdown-menu-end">
-                <li><button className="dropdown-item">
+                <li><button 
+                  className="dropdown-item"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditProject(project);
+                  }}
+                >
                   <i className="bi bi-pencil me-2"></i>Edit Project
                 </button></li>
                 <li><button className="dropdown-item">
                   <i className="bi bi-people me-2"></i>Manage Members
                 </button></li>
                 <li><hr className="dropdown-divider" /></li>
-                <li><button className="dropdown-item text-danger">
+                <li><button 
+                  className="dropdown-item text-danger"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteProject(project);
+                  }}
+                >
                   <i className="bi bi-trash me-2"></i>Delete Project
                 </button></li>
               </ul>

@@ -10,18 +10,36 @@ const DashboardHome = () => {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [showEditProject, setShowEditProject] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
   const [newProjectName, setNewProjectName] = useState('');
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState('grid'); 
 
   // Fetch projects
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/projects`);
-        setProjects(response.data);
+        console.log('Fetching projects for user:', user?.id);
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/projects/${user.id}`);
+        console.log('Fetched projects:', response.data);
+        
+        // Transform the backend data to match frontend format
+        const transformedProjects = response.data.map(project => ({
+          ...project,
+          owner: { firstName: user?.firstName, lastName: user?.lastName },
+          taskCount: 0,
+          completedTasks: 0,
+          memberCount: 1,
+          completionPercentage: 0,
+          dueDate: '2024-12-31',
+          createdAt: new Date().toISOString().split('T')[0]
+        }));
+        
+        setProjects(transformedProjects);
       } catch (error) {
         console.error('Failed to fetch projects:', error);
+        console.error('Error details:', error.response?.data);
         // Create mock data for demonstration
         setProjects([
           {
@@ -83,35 +101,137 @@ const DashboardHome = () => {
     if (!newProjectName.trim()) return;
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/projects`, {
+      console.log('Creating project with data:', {
         name: newProjectName,
-        createdBy: user?.id || user?.firstName,
+        createdBy: user?.id,
         description: '',
         status: 'Active',
         priority: 'Medium'
       });
 
-      const newProject = {
-        ...response.data,
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/projects`, {
         name: newProjectName,
+        createdBy: user?.id,
+        description: '',
+        status: 'Active',
+        priority: 'Medium'
+      });
+
+      console.log('Project creation response:', response.data);
+
+      // Instead of adding to local state, refresh the projects list
+      const projectsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/projects/${user.id}`);
+      console.log('Refreshed projects:', projectsResponse.data);
+      
+      // Transform the backend data to match frontend format
+      const transformedProjects = projectsResponse.data.map(project => ({
+        ...project,
         owner: { firstName: user?.firstName, lastName: user?.lastName },
         taskCount: 0,
         completedTasks: 0,
         memberCount: 1,
-        completionPercentage: 0
-      };
+        completionPercentage: 0,
+        dueDate: '2024-12-31',
+        createdAt: new Date().toISOString().split('T')[0]
+      }));
 
-      setProjects([...projects, newProject]);
+      setProjects(transformedProjects);
       setNewProjectName('');
       setShowCreateProject(false);
+      
+      console.log('Project created successfully and projects refreshed');
     } catch (error) {
       console.error('Failed to create project:', error);
-      alert('Failed to create project. Please try again.');
+      console.error('Error details:', error.response?.data);
+      alert(`Failed to create project: ${error.response?.data?.error || error.message}`);
     }
   };
 
   const handleSelectProject = (project) => {
     setSelectedProject(project);
+  };
+
+  const handleEditProject = (project) => {
+    setEditingProject(project);
+    setNewProjectName(project.name);
+    setShowEditProject(true);
+  };
+
+  const handleDeleteProject = async (project) => {
+    if (window.confirm(`Are you sure you want to delete "${project.name}"? This action cannot be undone.`)) {
+      try {
+        console.log('Deleting project:', project.id);
+        await axios.delete(`${process.env.REACT_APP_API_URL}/api/projects/${project.id}`, {
+          headers: {
+            'X-User-Id': user.id
+          }
+        });
+        
+        // Refresh projects from backend
+        const projectsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/projects/${user.id}`);
+        console.log('Refreshed projects after deletion:', projectsResponse.data);
+        
+        const transformedProjects = projectsResponse.data.map(project => ({
+          ...project,
+          owner: { firstName: user?.firstName, lastName: user?.lastName },
+          taskCount: 0,
+          completedTasks: 0,
+          memberCount: 1,
+          completionPercentage: 0,
+          dueDate: '2024-12-31',
+          createdAt: new Date().toISOString().split('T')[0]
+        }));
+
+        setProjects(transformedProjects);
+        console.log('Project deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete project:', error);
+        console.error('Error details:', error.response?.data);
+        alert(`Failed to delete project: ${error.response?.data?.error || error.message}`);
+      }
+    }
+  };
+
+  const handleUpdateProject = async (e) => {
+    e.preventDefault();
+    if (!newProjectName.trim()) return;
+
+    try {
+      console.log('Updating project:', editingProject.id, 'with name:', newProjectName);
+      await axios.put(`${process.env.REACT_APP_API_URL}/api/projects/${editingProject.id}/name`, {
+        projectName: newProjectName
+      }, {
+        headers: {
+          'X-User-Id': user.id
+        }
+      });
+
+      // Refresh projects from backend
+      const projectsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/projects/${user.id}`);
+      console.log('Refreshed projects after update:', projectsResponse.data);
+      
+      const transformedProjects = projectsResponse.data.map(project => ({
+        ...project,
+        owner: { firstName: user?.firstName, lastName: user?.lastName },
+        taskCount: 0,
+        completedTasks: 0,
+        memberCount: 1,
+        completionPercentage: 0,
+        dueDate: '2024-12-31',
+        createdAt: new Date().toISOString().split('T')[0]
+      }));
+
+      setProjects(transformedProjects);
+      setNewProjectName('');
+      setShowEditProject(false);
+      setEditingProject(null);
+      
+      console.log('Project updated successfully');
+    } catch (error) {
+      console.error('Failed to update project:', error);
+      console.error('Error details:', error.response?.data);
+      alert(`Failed to update project: ${error.response?.data?.error || error.message}`);
+    }
   };
 
   if (loading) {
@@ -140,7 +260,6 @@ const DashboardHome = () => {
           <div className="collapse navbar-collapse" id="navbarNav">
             <ul className="navbar-nav me-auto">
               <li className="nav-item"><Link className="nav-link" to="/">Home</Link></li>
-              <li className="nav-item"><Link className="nav-link" to="/my-work">My Work</Link></li>
               <li className="nav-item"><Link className="nav-link" to="/calendar">Calendar</Link></li>
               <li className="nav-item"><Link className="nav-link" to="/about">About</Link></li>
 
@@ -314,6 +433,8 @@ const DashboardHome = () => {
                       key={project.id}
                       project={project}
                       onSelectProject={handleSelectProject}
+                      onEditProject={handleEditProject}
+                      onDeleteProject={handleDeleteProject}
                     />
                   ))}
                 </div>
@@ -373,6 +494,59 @@ const DashboardHome = () => {
                   </button>
                   <button type="submit" className="btn btn-primary">
                     Create Project
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Project Modal */}
+      {showEditProject && (
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Edit Project</h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => {
+                    setShowEditProject(false);
+                    setEditingProject(null);
+                    setNewProjectName('');
+                  }}
+                ></button>
+              </div>
+              <form onSubmit={handleUpdateProject}>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label className="form-label">Project Name</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      placeholder="Enter project name"
+                      required 
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => {
+                      setShowEditProject(false);
+                      setEditingProject(null);
+                      setNewProjectName('');
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    Update Project
                   </button>
                 </div>
               </form>

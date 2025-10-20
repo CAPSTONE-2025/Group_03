@@ -5,6 +5,7 @@ export const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const buildFullName = (u) => {
     if (!u) return null;
@@ -17,15 +18,18 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuth = () => {
       const storedUser = localStorage.getItem("user");
+      console.log("Checking auth, stored user:", storedUser);
       if (storedUser) {
         try {
           let userData = JSON.parse(storedUser);
           userData = buildFullName(userData);
 
           if (userData && userData.id) {
+            console.log("User authenticated from localStorage:", userData);
             setUser(userData);
             setIsAuthenticated(true);
           } else {
+            console.log("Invalid user data, removing from localStorage");
             localStorage.removeItem("user");
             setIsAuthenticated(false);
           }
@@ -35,8 +39,10 @@ export const AuthProvider = ({ children }) => {
           setIsAuthenticated(false);
         }
       } else {
+        console.log("No stored user found");
         setIsAuthenticated(false);
       }
+      setIsLoading(false);
     };
 
     checkAuth();
@@ -52,10 +58,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const handleLogin = (userData) => {
+    console.log("handleLogin called with:", userData);
     const normalizedUser = buildFullName(userData);
+    console.log("Normalized user:", normalizedUser);
     setUser(normalizedUser);
     setIsAuthenticated(true);
     localStorage.setItem("user", JSON.stringify(normalizedUser));
+    console.log("User saved to localStorage");
   };
 
   const handleLogout = () => {
@@ -71,6 +80,7 @@ export const AuthProvider = ({ children }) => {
         setUser,
         isAuthenticated,
         setIsAuthenticated,
+        isLoading,
         handleLogin,
         handleLogout,
       }}
