@@ -29,14 +29,10 @@ const DashboardHome = () => {
         return;
       }
       try {
-        console.log('Fetching projects for user:', user.id);
         const response = await axios.get(
           `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
         );
-        console.log('Fetched projects:', response.data);
-
-        // Transform the backend data to match frontend format
-        const transformedProjects = (response.data || []).map(project => ({
+        const transformed = (response.data || []).map(project => ({
           ...project,
           owner: { firstName: user?.firstName, lastName: user?.lastName },
           taskCount: 0,
@@ -46,42 +42,48 @@ const DashboardHome = () => {
           dueDate: '2024-12-31',
           createdAt: new Date().toISOString().split('T')[0]
         }));
-
-        setProjects(transformedProjects);
+        setProjects(transformed);
       } catch (error) {
         console.error('Failed to fetch projects:', error);
-        console.error('Error details:', error.response?.data);
-        // Optional: fallback demo data
         setProjects([]);
       } finally {
         setLoading(false);
       }
     };
-
     fetchProjects();
   }, [user?.id, user?.firstName, user?.lastName]);
 
+  // Open "Create Project" modal from navbar link /?new=1
   useEffect(() => {
-  if (searchParams.get('new') === '1') {
-    setShowCreateProject(true);
-    // Clean the URL so refresh/back doesn’t reopen the modal
-    navigate(location.pathname, { replace: true });
-  }
-}, [searchParams, navigate, location.pathname]);
+    if (searchParams.get('new') === '1') {
+      setShowCreateProject(true);
+      // Clean the URL so refresh/back doesn’t reopen the modal
+      navigate(location.pathname, { replace: true });
+    }
+  }, [searchParams, navigate, location.pathname]);
+
+  const refreshProjectsForUser = async () => {
+    const projectsResponse = await axios.get(
+      `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
+    );
+    const transformed = (projectsResponse.data || []).map(project => ({
+      ...project,
+      owner: { firstName: user?.firstName, lastName: user?.lastName },
+      taskCount: 0,
+      completedTasks: 0,
+      memberCount: 1,
+      completionPercentage: 0,
+      dueDate: '2024-12-31',
+      createdAt: new Date().toISOString().split('T')[0]
+    }));
+    setProjects(transformed);
+  };
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
     if (!newProjectName.trim() || !user?.id) return;
 
     try {
-      console.log('Creating project with data:', {
-        name: newProjectName,
-        createdBy: user.id,
-        description: '',
-        status: 'Active',
-        priority: 'Medium'
-      });
-
       await axios.post(`${process.env.REACT_APP_API_URL}/api/projects`, {
         name: newProjectName,
         createdBy: user.id,
@@ -90,29 +92,14 @@ const DashboardHome = () => {
         priority: 'Medium'
       });
 
-      // Refresh the list
-      const projectsResponse = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
-      );
-
-      const transformedProjects = (projectsResponse.data || []).map(project => ({
-        ...project,
-        owner: { firstName: user?.firstName, lastName: user?.lastName },
-        taskCount: 0,
-        completedTasks: 0,
-        memberCount: 1,
-        completionPercentage: 0,
-        dueDate: '2024-12-31',
-        createdAt: new Date().toISOString().split('T')[0]
-      }));
-
-      setProjects(transformedProjects);
+      await refreshProjectsForUser();
       setNewProjectName('');
       setShowCreateProject(false);
-      console.log('Project created successfully and projects refreshed');
+
+      // Tell navbar to refresh immediately
+      window.dispatchEvent(new Event('projects:refresh'));
     } catch (error) {
       console.error('Failed to create project:', error);
-      console.error('Error details:', error.response?.data);
       alert(`Failed to create project: ${error.response?.data?.error || error.message}`);
     }
   };
@@ -131,33 +118,17 @@ const DashboardHome = () => {
       return;
     }
     try {
-      console.log('Deleting project:', project.id);
       await axios.delete(
         `${process.env.REACT_APP_API_URL}/api/projects/${project.id}`,
         { headers: { 'X-User-Id': user.id } }
       );
 
-      // Refresh
-      const projectsResponse = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
-      );
+      await refreshProjectsForUser();
 
-      const transformedProjects = (projectsResponse.data || []).map(project => ({
-        ...project,
-        owner: { firstName: user?.firstName, lastName: user?.lastName },
-        taskCount: 0,
-        completedTasks: 0,
-        memberCount: 1,
-        completionPercentage: 0,
-        dueDate: '2024-12-31',
-        createdAt: new Date().toISOString().split('T')[0]
-      }));
-
-      setProjects(transformedProjects);
-      console.log('Project deleted successfully');
+      // Tell navbar to refresh immediately
+      window.dispatchEvent(new Event('projects:refresh'));
     } catch (error) {
       console.error('Failed to delete project:', error);
-      console.error('Error details:', error.response?.data);
       alert(`Failed to delete project: ${error.response?.data?.error || error.message}`);
     }
   };
@@ -167,38 +138,21 @@ const DashboardHome = () => {
     if (!newProjectName.trim() || !editingProject?.id || !user?.id) return;
 
     try {
-      console.log('Updating project:', editingProject.id, 'with name:', newProjectName);
       await axios.put(
         `${process.env.REACT_APP_API_URL}/api/projects/${editingProject.id}/name`,
         { projectName: newProjectName },
         { headers: { 'X-User-Id': user.id } }
       );
 
-      // Refresh
-      const projectsResponse = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
-      );
-
-      const transformedProjects = (projectsResponse.data || []).map(project => ({
-        ...project,
-        owner: { firstName: user?.firstName, lastName: user?.lastName },
-        taskCount: 0,
-        completedTasks: 0,
-        memberCount: 1,
-        completionPercentage: 0,
-        dueDate: '2024-12-31',
-        createdAt: new Date().toISOString().split('T')[0]
-      }));
-
-      setProjects(transformedProjects);
+      await refreshProjectsForUser();
       setNewProjectName('');
       setShowEditProject(false);
       setEditingProject(null);
 
-      console.log('Project updated successfully');
+      // Tell navbar to refresh immediately
+      window.dispatchEvent(new Event('projects:refresh'));
     } catch (error) {
       console.error('Failed to update project:', error);
-      console.error('Error details:', error.response?.data);
       alert(`Failed to update project: ${error.response?.data?.error || error.message}`);
     }
   };

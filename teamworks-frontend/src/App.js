@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import './App.css';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import AppLayout from "./layouts/AppLayout";
@@ -8,22 +8,18 @@ import AboutPage from './pages/About';
 import CalendarPage from './pages/Calendar';
 import BacklogPage from './pages/Backlog';
 import SignUp from './pages/Signup';
-import WelcomePage from './pages/WelcomePage'; 
-import Login from './pages/Login'; 
+import WelcomePage from './pages/WelcomePage';
+import Login from './pages/Login';
 import KanbanBoardPage from './pages/KanbanBoard';
 import ProfilePage from "./pages/Profile";
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import axios from "axios";
 
 function AppContent() {
-  const { isAuthenticated, user, handleLogout, isLoading } = useAuth();
-  
-  console.log("AppContent render - isAuthenticated:", isAuthenticated, "user:", user, "isLoading:", isLoading);
+  const { isAuthenticated, isLoading } = useAuth();
 
-  // Show loading spinner while checking authentication
   if (isLoading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
@@ -66,13 +62,10 @@ function AppContent() {
   );
 }
 
-// ✅ Wrap with AuthProvider
-function App() {
+export default function App() {
   return (
     <AuthProvider>
       <AppContent />
     </AuthProvider>
   );
 }
-
-export default App;

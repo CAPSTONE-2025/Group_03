@@ -11,29 +11,37 @@ export default function AppLayout() {
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
 
-  useEffect(() => {
-    let ignore = false;
-    (async () => {
-      if (!user?.id) {
-        if (!ignore) { setProjects([]); setLoadingProjects(false); }
-        return;
-      }
-      try {
-        const res = await axios.get(
-          `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
-        );
-        if (!ignore) setProjects(res.data || []);
-      } catch (e) {
-        console.error("Navbar projects fetch failed:", e);
-        if (!ignore) setProjects([]);
-      } finally {
-        if (!ignore) setLoadingProjects(false);
-      }
-    })();
-    return () => { ignore = true; };
+  const fetchProjects = useCallback(async () => {
+    if (!user?.id) {
+      setProjects([]);
+      setLoadingProjects(false);
+      return;
+    }
+    try {
+      setLoadingProjects(true);
+      const res = await axios.get(
+        `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
+      );
+      setProjects(res.data || []);
+    } catch (e) {
+      console.error("Navbar projects fetch failed:", e);
+      setProjects([]);
+    } finally {
+      setLoadingProjects(false);
+    }
   }, [user?.id]);
 
-  // if you had a rogue contenteditable causing the caret, you can keep this:
+  // initial + on user change
+  useEffect(() => { fetchProjects(); }, [fetchProjects]);
+
+  // allow pages to signal a refresh
+  useEffect(() => {
+    const handler = () => fetchProjects();
+    window.addEventListener("projects:refresh", handler);
+    return () => window.removeEventListener("projects:refresh", handler);
+  }, [fetchProjects]);
+
+  // If you had rogue contenteditable causing blinking caret:
   // useEffect(() => {
   //   document.querySelectorAll("[contenteditable],[contentEditable='true']").forEach(el => {
   //     el.removeAttribute("contenteditable");
@@ -94,15 +102,9 @@ export default function AppLayout() {
                       <div className="dropdown-item d-flex flex-column align-items-start">
                         <div className="fw-semibold text-truncate" title={p.name}>{p.name}</div>
                         <div className="mt-1 d-flex gap-2">
-                          <Link className="btn btn-sm btn-outline-primary" to={`/projects/${p.id}/backlog`}>
-                            Backlog
-                          </Link>
-                          <Link className="btn btn-sm btn-outline-success" to={`/projects/${p.id}/kanbanboard`}>
-                            Kanban
-                          </Link>
-                          <Link className="btn btn-sm btn-outline-info" to={`/projects/${p.id}/calendar`}>
-                            Calendar
-                          </Link>
+                          <Link className="btn btn-sm btn-outline-primary" to={`/projects/${p.id}/backlog`}>Backlog</Link>
+                          <Link className="btn btn-sm btn-outline-success" to={`/projects/${p.id}/kanbanboard`}>Kanban</Link>
+                          <Link className="btn btn-sm btn-outline-info" to={`/projects/${p.id}/calendar`}>Calendar</Link>
                         </div>
                       </div>
                     </li>
@@ -110,7 +112,7 @@ export default function AppLayout() {
 
                   <li><hr className="dropdown-divider" /></li>
                   <li className="px-2">
-                    {/* Route to home with a query to open the create-project modal if you want */}
+                    {/* opens modal on DashboardHome via ?new=1 */}
                     <Link className="dropdown-item text-primary" to="/?new=1">
                       + Create Project
                     </Link>
