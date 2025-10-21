@@ -1,5 +1,5 @@
-// src/pages/DashboardHome.jsx
 import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ProjectCard from '../components/ProjectCard';
 import axios from 'axios';
@@ -7,6 +7,9 @@ import '../Dashboard.css';
 
 const DashboardHome = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -57,6 +60,14 @@ const DashboardHome = () => {
 
     fetchProjects();
   }, [user?.id, user?.firstName, user?.lastName]);
+
+  useEffect(() => {
+  if (searchParams.get('new') === '1') {
+    setShowCreateProject(true);
+    // Clean the URL so refresh/back doesn’t reopen the modal
+    navigate(location.pathname, { replace: true });
+  }
+}, [searchParams, navigate, location.pathname]);
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
