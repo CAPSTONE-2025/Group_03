@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import NotificationBell from "../components/NotificationBell";
 import axios from "axios";
 
 export default function AppLayout() {
@@ -78,6 +79,10 @@ export default function AppLayout() {
                 <Link className="nav-link" to="/">Home</Link>
               </li>
 
+              <li className="nav-item">
+                <Link className="nav-link" to="/about">About</Link>
+              </li>
+
               {/* Projects dropdown (global) */}
               <li className="nav-item dropdown">
                 <button
@@ -123,12 +128,13 @@ export default function AppLayout() {
               <li className="nav-item">
                 <Link className="nav-link" to="/calendar">Calendar</Link>
               </li>
-              <li className="nav-item">
-                <Link className="nav-link" to="/about">About</Link>
-              </li>
+
             </ul>
 
             <div className="d-flex align-items-center">
+
+              {/* 🔔 */}
+              <NotificationBell />
               <Link className="nav-link me-3" to="/profile">
                 <i className="bi bi-person fs-5" />
               </Link>
@@ -145,7 +151,7 @@ export default function AppLayout() {
       </main>
 
       <footer className="footer bg-light text-center py-3 mt-auto">
-        <small>&copy; {new Date().getFullYear()} TeamWorks. Seongjun, Jimbert, Gary.</small>
+        <small>&copy; {new Date().getFullYear()} TeamWorks. Seongjun, Jimbert, Gary, Fawad.</small>
       </footer>
     </div>
   );
