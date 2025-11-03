@@ -219,17 +219,14 @@ function Backlog() {
       <div className="row">
         {/* ----------- LEFT SIDE (TASK LIST) ----------- */}
         <div className={showForm || showTaskForm ? "col-lg-7 col-md-12" : "col-12"}>
-          <h2 className="mb-4 text-center">{projectName}</h2>
+          <h3 className="text-center mb-4">
+            Backlog Board {projectName ? <span className="text-muted">– {projectName}</span> : null}
+          </h3>
 
           {/* Controls */}
-          <div className="d-flex align-items-center justify-content-between mb-2">
-            <div>
-              <small className="text-muted">
-                Pending invites: {pendingInvites.map((p) => p.email).join(", ") || "—"}
-              </small>
-            </div>
-            <div>
-              <button className="btn btn-outline-secondary me-2" onClick={openInvite}>
+          <div className="d-flex align-items-center mb-2">
+            <div className="ms-auto">
+              <button className="btn btn-outline-secondary" onClick={openInvite}>
                 Invite Members
               </button>
             </div>
