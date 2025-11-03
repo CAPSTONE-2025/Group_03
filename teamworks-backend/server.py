@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from model import get_users_collection, get_comments_collection, get_projects_collection
+from model import get_users_collection, get_comments_collection, get_projects_collection, get_notifications_collection
 from model import backlog_collection
 import bcrypt
 from bson import ObjectId
@@ -64,13 +64,22 @@ def get_project(project_id):
         "members": [str(m) for m in p.get("members", [])],
     })
 
+
 # -------------------- Owner/auth helpers--------------------
+
 def get_request_user_id():
     uid = request.headers.get("X-User-Id")
     try:
         return ObjectId(uid) if uid else None
     except Exception:
         return None
+    
+    
+def get_request_user():
+    uid = get_request_user_id()
+    if not uid:
+        return None
+    return get_users_collection().find_one({"_id": uid})
 
 
 def require_project_owner(fn):
@@ -109,6 +118,142 @@ def require_project_owner(fn):
 #         return jsonify({"error": "Project not found or user already a member"}), 404
 
 #     return jsonify({"message": "User invited successfully"}), 200
+
+
+# -------------------- PROJECT INVITE (Receiving)---------------------
+
+@app.route("/api/invitations", methods=["GET"])
+def list_invitations():
+    """
+    Auth required: X-User-Id
+    Returns pending invites for the logged-in user's email.
+    """
+    udoc = get_request_user()
+    if not udoc:
+        return jsonify({"error": "Missing X-User-Id header"}), 401
+
+    email = (udoc.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"error": "User has no email on file"}), 400
+
+    cursor = get_projects_collection().find(
+        {"pendingInvites.email": email},
+        {"name": 1, "pendingInvites": 1, "owner": 1}
+    )
+
+    results = []
+    for p in cursor:
+        for inv in p.get("pendingInvites", []):
+            if (inv.get("email") or "").lower() == email:
+                results.append({
+                    "projectId": str(p["_id"]),
+                    "projectName": p.get("name", ""),
+                    "invitedAt": inv.get("invitedAt").isoformat() if isinstance(inv.get("invitedAt"), datetime) else str(inv.get("invitedAt", "")),
+                    "invitedBy": str(inv.get("invitedBy")) if inv.get("invitedBy") else None,
+                    "ownerId": str(p.get("owner")) if p.get("owner") else None
+                })
+                break
+    return jsonify(results), 200
+
+
+@app.route("/api/invitations/respond", methods=["POST"])
+def respond_invitation():
+    """
+    Body: { "projectId": "...", "action": "accept" | "decline" }
+    Auth required: X-User-Id
+    Uses the logged-in user's email; ignores any email in the body.
+    """
+    user_id = get_request_user_id()
+    udoc = get_request_user()
+    if not user_id or not udoc:
+        return jsonify({"error": "Missing X-User-Id header"}), 401
+
+    data = request.json or {}
+    project_id = data.get("projectId")
+    action = (data.get("action") or "").strip().lower()
+    if not project_id or action not in ("accept", "decline"):
+        return jsonify({"error": "projectId and action are required"}), 400
+
+    email = (udoc.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"error": "Your account has no email"}), 400
+
+    projects = get_projects_collection()
+    proj = projects.find_one(
+        {"_id": ObjectId(project_id), "pendingInvites.email": email},
+        {"owner": 1, "name": 1, "pendingInvites": 1}
+    )
+    if not proj:
+        return jsonify({"error": "Invite not found"}), 404
+
+    pull_invite = {
+        "$pull": {"pendingInvites": {"email": email}},
+        "$set": {"updatedAt": datetime.utcnow()}
+    }
+
+    if action == "accept":
+        projects.update_one(
+            {"_id": ObjectId(project_id)},
+            { "$addToSet": {"members": user_id}, **pull_invite }
+        )
+        status_text = "accepted"
+    else:
+        projects.update_one({"_id": ObjectId(project_id)}, pull_invite)
+        status_text = "declined"
+
+    # Notify owner
+    owner = proj.get("owner")
+    if owner:
+        ncol = get_notifications_collection()
+        ncol.insert_one({
+            "userId": owner,
+            "projectId": ObjectId(project_id),
+            "type": "invite-response",
+            "message": f'{udoc.get("firstName","")} {udoc.get("lastName","")} {status_text} your invitation to "{proj.get("name","")}".',
+            "createdAt": datetime.utcnow(),
+            "isRead": False
+        })
+
+    return jsonify({"message": f"Invitation {status_text}."}), 200
+
+
+#---------------------Owner notifications list & mark read---------------------
+
+@app.route("/api/notifications", methods=["GET"])
+def list_notifications():
+    user_id = get_request_user_id()
+    if not user_id:
+        return jsonify({"error": "Missing X-User-Id header"}), 401
+    cur = get_notifications_collection().find(
+        {"userId": user_id}
+    ).sort("createdAt", -1)
+    out = []
+    for n in cur:
+        out.append({
+            "id": str(n["_id"]),
+            "projectId": str(n.get("projectId")) if n.get("projectId") else None,
+            "type": n.get("type"),
+            "message": n.get("message", ""),
+            "isRead": bool(n.get("isRead", False)),
+            "createdAt": n.get("createdAt").isoformat() if isinstance(n.get("createdAt"), datetime) else str(n.get("createdAt",""))
+        })
+    return jsonify(out), 200
+
+
+@app.route("/api/notifications/<nid>/read", methods=["PATCH"])
+def mark_notification_read(nid):
+    user_id = get_request_user_id()
+    if not user_id:
+        return jsonify({"error": "Missing X-User-Id header"}), 401
+
+    get_notifications_collection().update_one(
+        {"_id": ObjectId(nid), "userId": user_id},
+        {"$set": {"isRead": True}}
+    )
+    return jsonify({"message": "Marked read"}), 200
+
+
+# -------------------- PROJECT INVITE (Sending)---------------------
 
 @app.route('/api/projects/<project_id>/invite', methods=['POST'])
 @require_project_owner
@@ -258,6 +403,29 @@ def delete_project(project_id):
 #     return jsonify(tasks)
 
 
+def _as_iso_date(value):
+    """
+    Accepts: 'YYYY-MM-DD', full ISO8601 string, datetime/date objects, or missing.
+    Returns: ISO date string 'YYYY-MM-DD' or '' if value is falsy.
+    """
+    if not value:
+        return ""
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, str):
+        # try plain date
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
+        except ValueError:
+            # try full ISO (and tolerate Z)
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00")).date().isoformat()
+            except Exception:
+                # if it's some other string, just return as-is to avoid 500s
+                return value
+    return str(value)
+
+
 @app.route('/api/projects/<project_id>/backlog', methods=['GET'])
 def get_project_backlog(project_id):
     tasks = []
@@ -270,6 +438,7 @@ def get_project_backlog(project_id):
             "status": task["status"],
             "priority": task["priority"],
             "assignedTo": task["assignedTo"],
+            "startDate": task["startDate"],
             "dueDate": task["dueDate"],
             "projectId": str(task["projectId"]),
         })
@@ -300,10 +469,16 @@ def get_project_backlog(project_id):
 @app.route('/api/projects/<project_id>/backlog', methods=['POST'])
 def create_project_backlog(project_id):
     data = request.json
-    required_fields = ["title", "description", "label", "status", "priority", "assignedTo", "dueDate"]
+    required_fields = ["title", "description", "label", "status", "priority", "assignedTo", "startDate", "dueDate"]
     for field in required_fields:
         if field not in data:
             return jsonify({"error": f"{field} is required"}), 400
+
+    # single assignee → ObjectId
+    try:
+        assigned_id = ObjectId(data["assignedTo"])
+    except Exception:
+        return jsonify({"error": "assignedTo must be a valid user id"}), 400
 
     task = {
         "title": data["title"],
@@ -312,6 +487,7 @@ def create_project_backlog(project_id):
         "status": data["status"],
         "priority": data["priority"],
         "assignedTo": data["assignedTo"],
+        "startDate": data["startDate"],
         "dueDate": data["dueDate"],
         "projectId": ObjectId(project_id),
     }
@@ -335,6 +511,7 @@ def update_task(project_id, task_id):
         "status",
         "priority",
         "assignedTo",
+        "startDate",
         "dueDate",
     ]
     update = {field: data[field] for field in allowed_fields if field in data}

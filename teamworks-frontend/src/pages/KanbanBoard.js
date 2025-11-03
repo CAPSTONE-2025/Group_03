@@ -84,6 +84,7 @@ function KanbanBoard() {
                                             <span className="badge bg-info">{task.priority}</span>
                                         </div>
                                         <div className="d-flex justify-content-between align-items-center mb-2">
+                                            <span className="badge bg-primary">{task.startDate}</span>
                                             <span className="badge bg-secondary">{task.dueDate}</span>
                                             <span className="badge bg-dark">{task.assignedTo}</span>
                                         </div>

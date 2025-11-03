@@ -11,16 +11,20 @@ function Backlog() {
   const { projectId } = useParams();
   const { user } = useContext(AuthContext);
 
-    // ✅ Set the caller header for Flask guards (owner/access checks)
+  // ---- member options + lookup for display ----
+  const [memberOptions, setMemberOptions] = useState([]); // [{id,email,name}]
+  const [memberLookup, setMemberLookup] = useState({});   // { userId: "Name or email" }
+
+  // ✅ Set the caller header for Flask guards (owner/access checks)
   useEffect(() => {
     if (user?.id) {
-      axios.defaults.headers.common["X-User-Id"] = user.id;   // <-- NEW
+      axios.defaults.headers.common["X-User-Id"] = user.id;
     } else {
       delete axios.defaults.headers.common["X-User-Id"];
     }
   }, [user]);
 
-  // -------------------- STATE --------------------
+  // ---- state ----
   const [tasks, setTasks] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -37,23 +41,83 @@ function Backlog() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // ---- invite modal state (replaces window.prompt/alert) ----
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteError, setInviteError] = useState("");
+  const [inviteSuccess, setInviteSuccess] = useState("");
+
+  const openInvite = () => {
+    setInviteEmail("");
+    setInviteError("");
+    setInviteSuccess("");
+    setShowInvite(true);
+  };
+  const closeInvite = () => {
+    setShowInvite(false);
+    setInviteError("");
+    setInviteSuccess("");
+  };
+  const submitInvite = async (e) => {
+    e?.preventDefault?.();
+    const trimmed = (inviteEmail || "").trim().toLowerCase();
+    setInviteError("");
+    setInviteSuccess("");
+
+    if (!trimmed || !trimmed.includes("@")) {
+      setInviteError("Please enter a valid email address.");
+      return;
+    }
+
+    try {
+      const { data } = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/invite`,
+        { emails: [trimmed] }
+      );
+      setPendingInvites(data.pendingInvites || []);
+      setInviteSuccess(`Invitation sent to ${trimmed}.`);
+      // Optional: close modal after success
+      // setTimeout(closeInvite, 900);
+    } catch (err) {
+      const msg = err.response?.data?.error || "Failed to send invite.";
+      setInviteError(msg);
+    }
+  };
+
   const API_URL = projectId
     ? `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/backlog`
     : null;
 
-    // -------------------- EFFECTS --------------------
-
-    // Project name fetch
+  // -------------------- EFFECTS --------------------
+  // Project name + members
   useEffect(() => {
     if (!projectId) return;
-    axios.get(`${process.env.REACT_APP_API_URL}/api/project/${projectId}`)
-        .then(res => setProjectName(res.data.name))
-        .catch(() => setProjectName("Unknown Project"));
+
+    (async () => {
+      try {
+        const pres = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/project/${projectId}`
+        );
+        setProjectName(pres.data.name);
+        const memberIds = pres.data.members || [];
+
+        const ures = await axios.get(`${process.env.REACT_APP_API_URL}/api/users`);
+        const allUsers = Array.isArray(ures.data) ? ures.data : [];
+        const onlyMembers = allUsers.filter((u) => memberIds.includes(String(u.id)));
+        setMemberOptions(onlyMembers);
+
+        const lookup = {};
+        for (const u of onlyMembers) lookup[String(u.id)] = u.name || u.email;
+        setMemberLookup(lookup);
+      } catch {
+        setProjectName("Unknown Project");
+      }
+    })();
   }, [projectId]);
 
-
+  // Tasks
   useEffect(() => {
-    if (!projectId || !API_URL) return; // ✅ safe check inside hook
+    if (!projectId || !API_URL) return;
 
     const fetchTasks = async () => {
       try {
@@ -69,40 +133,14 @@ function Backlog() {
     fetchTasks();
   }, [projectId, API_URL]);
 
-  // then conditionally render UI (but AFTER hooks)
   if (!projectId) {
     return <div>No project selected. Please go back to your projects.</div>;
   }
 
- // -------------------- HANDLERS invite --------------------
-
-  const handleInvite = async () => {
-    const email = window.prompt("Enter a Teamworks account email to invite:");
-    if (!email) return;
-
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed.includes("@")) {
-      alert("Please enter a valid email address.");
-      return;
-    }
-
-    try {
-      const { data } = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/invite`,
-        { emails: [trimmed] } // ✅ only one email each time
-      );
-      setPendingInvites(data.pendingInvites || []);
-      alert(`${trimmed} added to pending invites.`);
-    } catch (err) {
-      console.error("Invite error:", err.response?.data || err.message);
-      alert(err.response?.data?.error || "Failed to send invite.");
-    }
-  };
-
   // -------------------- HANDLERS --------------------
   const handleAddTask = async (newTask) => {
     try {
-      const response = await axios.post(API_URL, newTask); // projectId is in URL
+      const response = await axios.post(API_URL, newTask);
       setTasks([...tasks, { ...newTask, id: response.data.id }]);
       setShowForm(false);
     } catch (err) {
@@ -132,11 +170,7 @@ function Backlog() {
   const handleEditTask = async (updatedTask) => {
     try {
       await axios.put(`${API_URL}/${updatedTask.id}`, updatedTask);
-      setTasks(
-        tasks.map((task) =>
-          task.id === updatedTask.id ? updatedTask : task
-        )
-      );
+      setTasks(tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
       setSelectedTask(updatedTask);
       setIsEditing(false);
     } catch (err) {
@@ -149,7 +183,7 @@ function Backlog() {
 
     try {
       await axios.delete(`${API_URL}/${selectedTaskId}`);
-      setTasks(tasks.filter((task) => task.id !== selectedTaskId));
+      setTasks(tasks.filter((t) => t.id !== selectedTaskId));
       setSelectedTaskId(null);
     } catch (err) {
       setError(err);
@@ -167,14 +201,10 @@ function Backlog() {
           author: user?.fullName || "Anonymous",
         }
       );
-
       setComments([...comments, response.data]);
       setNewComment("");
     } catch (err) {
-      console.error(
-        "Error adding comment:",
-        err.response?.data || err.message
-      );
+      console.error("Error adding comment:", err.response?.data || err.message);
       alert("Failed to add comment.");
     }
   };
@@ -188,22 +218,18 @@ function Backlog() {
     <div className="container mt-4">
       <div className="row">
         {/* ----------- LEFT SIDE (TASK LIST) ----------- */}
-        <div
-          className={
-            showForm || showTaskForm ? "col-lg-7 col-md-12" : "col-12"
-          }
-        >
+        <div className={showForm || showTaskForm ? "col-lg-7 col-md-12" : "col-12"}>
           <h2 className="mb-4 text-center">{projectName}</h2>
+
           {/* Controls */}
           <div className="d-flex align-items-center justify-content-between mb-2">
             <div>
-              {/* Optional: show pending invites */}
               <small className="text-muted">
-                Pending invites: {pendingInvites.map(p => p.email).join(", ") || "—"}
+                Pending invites: {pendingInvites.map((p) => p.email).join(", ") || "—"}
               </small>
             </div>
             <div>
-              <button className="btn btn-outline-secondary me-2" onClick={handleInvite}>
+              <button className="btn btn-outline-secondary me-2" onClick={openInvite}>
                 Invite Members
               </button>
             </div>
@@ -218,6 +244,7 @@ function Backlog() {
                 <th>Status</th>
                 <th>Priority</th>
                 <th>Assigned To</th>
+                <th>Start Date</th>
                 <th>Due Date</th>
               </tr>
             </thead>
@@ -233,13 +260,15 @@ function Backlog() {
                       type="checkbox"
                       checked={selectedTaskId === task.id}
                       onChange={() => handleSelectTask(task.id)}
+                      onClick={(e) => e.stopPropagation()}
                     />
                   </td>
                   <td>{task.title}</td>
                   <td>{task.label}</td>
                   <td>{task.status}</td>
                   <td>{task.priority}</td>
-                  <td>{task.assignedTo}</td>
+                  <td>{memberLookup[String(task.assignedTo)] || task.assignedTo}</td>
+                  <td>{task.startDate}</td>
                   <td>{task.dueDate}</td>
                 </tr>
               ))}
@@ -274,6 +303,7 @@ function Backlog() {
               <AddTaskForm
                 onAdd={handleAddTask}
                 onCancel={() => setShowForm(false)}
+                members={memberOptions}
               />
             )}
 
@@ -282,6 +312,7 @@ function Backlog() {
               <>
                 <TaskForm
                   task={selectedTask}
+                  memberLookup={memberLookup}
                   onEdit={() => setIsEditing(true)}
                   onClose={() => {
                     setShowTaskForm(false);
@@ -306,10 +337,7 @@ function Backlog() {
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
                     />
-                    <button
-                      className="btn btn-primary"
-                      onClick={handleAddComment}
-                    >
+                    <button className="btn btn-primary" onClick={handleAddComment}>
                       Add Comment
                     </button>
                   </div>
@@ -323,11 +351,82 @@ function Backlog() {
                 task={selectedTask}
                 onEdit={handleEditTask}
                 onCancel={() => setIsEditing(false)}
+                members={memberOptions}
               />
             )}
           </div>
         )}
       </div>
+
+      {/* ----------- INVITE MODAL ----------- */}
+      {showInvite && (
+        <>
+          {/* Backdrop */}
+          <div className="modal-backdrop fade show"></div>
+
+          {/* Modal */}
+          <div
+            className="modal fade show"
+            tabIndex="-1"
+            role="dialog"
+            aria-modal="true"
+            style={{ display: "block" }}
+          >
+            <div className="modal-dialog">
+              <div className="modal-content">
+                <form onSubmit={submitInvite}>
+                  <div className="modal-header">
+                    <h5 className="modal-title">Invite Members</h5>
+                    <button
+                      type="button"
+                      className="btn-close"
+                      aria-label="Close"
+                      onClick={closeInvite}
+                    />
+                  </div>
+
+                  <div className="modal-body">
+                    <div className="mb-3">
+                      <label htmlFor="inviteEmail" className="form-label">
+                        Teamworks account email
+                      </label>
+                      <input
+                        id="inviteEmail"
+                        type="email"
+                        className="form-control"
+                        placeholder="name@example.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    {inviteError && (
+                      <div className="alert alert-danger py-2">{inviteError}</div>
+                    )}
+                    {inviteSuccess && (
+                      <div className="alert alert-success py-2">{inviteSuccess}</div>
+                    )}
+
+                    <small className="text-muted d-block">
+                      We’ll add this email to the project’s pending invites.
+                    </small>
+                  </div>
+
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={closeInvite}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary">
+                      Send Invite
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
