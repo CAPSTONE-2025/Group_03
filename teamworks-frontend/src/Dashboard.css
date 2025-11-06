@@ -90,33 +90,60 @@
 }
 
 .calendar-day.today {
-  background-color: #e3f2fd;
+  background-color: #cfe3f2;
 }
 
-.calendar-day.has-events {
-  background-color: #fff3e0;
-}
+
 
 .calendar-day:hover {
   background-color: #f8f9fa;
 }
 
 .day-number {
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: #495057;
+  /* size: responsive but bounded */
+    width: clamp(20px, 2vw, 25px);
+    height: clamp(20px, 2vw, 25px);
+  
+    /* center the number inside the circle */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  
+    margin: 0 auto 6px;
+    /* center horizontally inside the calendar cell */
+    font-weight: 600;
+    font-size: 0.9rem;
+    line-height: 1;
+  
+    /* circle */
+    border-radius: 50%;
+    
+    /* keeps border inside width/height */
+    box-sizing: border-box;
+  
+    /* color of the number */
+    /* color: #ffffff; */
+  
+    /* If you rely on dynamic bg-* classes (e.g. bg-warning), keep them;
+       otherwise set a default background here */
+    background-clip: padding-box;
+    /* prevents border overlap */
 }
 
 .day-events {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
+    
+   display: inline-block;
+
+  overflow: hidden;
+    /* hide overflow */
+    text-overflow: ellipsis;
 }
+
 
 .event-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  /* border-radius: 50%; */
   display: inline-block;
 }
 
