@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
-function AddTaskForm({ onAdd, onCancel }) {
+function AddTaskForm({ onAdd, onCancel, members = [] }) {
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -9,6 +9,7 @@ function AddTaskForm({ onAdd, onCancel }) {
     status: "",
     priority: "",
     assignedTo: "",
+    startDate: "",
     dueDate: "",
   });
 
@@ -26,6 +27,7 @@ function AddTaskForm({ onAdd, onCancel }) {
       status: "",
       priority: "",
       assignedTo: "",
+      startDate: "",
       dueDate: "",
     });
   };
@@ -112,7 +114,7 @@ function AddTaskForm({ onAdd, onCancel }) {
           </select>
         </div>
 
-        <div className="form-group">
+        {/* <div className="form-group">
           <label htmlFor="assignedTo">Assigned To</label>
           <input
             type="text"
@@ -123,7 +125,41 @@ function AddTaskForm({ onAdd, onCancel }) {
             onChange={handleInputChange}
             required
           />
+        </div> */}
+
+      <div className="form-group">
+         <label htmlFor="assignedTo">Assigned To</label>
+         <select
+           className="form-control"
+           id="assignedTo"
+           name="assignedTo"
+           value={newTask.assignedTo}
+           onChange={handleInputChange}
+           required
+         >
+           <option value="">Select a member</option>
+           {members.map((m) => (
+             <option key={m.id} value={m.id}>
+               {m.name || m.email}
+            </option>
+           ))}
+         </select>
+       </div>
+
+
+        <div className="form-group">
+          <label htmlFor="startDate">Start Date</label>
+          <input
+            type="date"
+            className="form-control"
+            id="startDate"
+            name="startDate"
+            value={newTask.startDate}
+            onChange={handleInputChange}
+            required
+          />
         </div>
+
 
         <div className="form-group">
           <label htmlFor="dueDate">Due Date</label>

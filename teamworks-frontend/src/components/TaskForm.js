@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 
-function TaskForm({ task, onEdit, onClose }) {
+function TaskForm({ task, onEdit, onClose, memberLookup = {} }) {
 
     return (
         <div className="card p-3">
@@ -21,7 +21,10 @@ function TaskForm({ task, onEdit, onClose }) {
             <p className="mb-1"><strong>Priority:</strong></p> 
             <p>{task.priority}</p>
             <p className="mb-1"><strong>Assigned To:</strong></p> 
-            <p>{task.assignedTo}</p>
+            {/* <p>{task.assignedTo}</p> */}
+            <p>{memberLookup[String(task.assignedTo)] || task.assignedTo}</p>
+            <p className="mb-1"><strong>Start Date:</strong></p> 
+            <p>{task.startDate}</p>
             <p className="mb-1"><strong>Due Date:</strong></p> 
             <p>{task.dueDate}</p>
 

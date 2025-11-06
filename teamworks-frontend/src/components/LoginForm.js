@@ -28,8 +28,12 @@ export default function LoginForm({ setIsAuthenticated }) {
 
             const result = await response.json();
             if (response.ok) {
+                console.log("Login successful, setting user:", result.user);
                 setIsAuthenticated(result.user);  
-                navigate("/");  
+                // Add a small delay to ensure state is updated
+                setTimeout(() => {
+                    navigate("/");  
+                }, 100);
             } else {
                 alert(result.error);
             }

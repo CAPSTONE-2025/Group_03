@@ -35,6 +35,9 @@ def get_users_collection():
 def get_comments_collection():
     return comments_collection
 
+def get_notifications_collection():
+    return db["notifications"]
+
 # Test connection
 try:
     client.admin.command("ping")
