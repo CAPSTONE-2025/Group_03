@@ -18,18 +18,18 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuth = () => {
       const storedUser = localStorage.getItem("user");
-      console.log("Checking auth, stored user:", storedUser);
+      // console.log("Checking auth, stored user:", storedUser);
       if (storedUser) {
         try {
           let userData = JSON.parse(storedUser);
           userData = buildFullName(userData);
 
           if (userData && userData.id) {
-            console.log("User authenticated from localStorage:", userData);
+            // console.log("User authenticated from localStorage:", userData);
             setUser(userData);
             setIsAuthenticated(true);
           } else {
-            console.log("Invalid user data, removing from localStorage");
+            // console.log("Invalid user data, removing from localStorage");
             localStorage.removeItem("user");
             setIsAuthenticated(false);
           }

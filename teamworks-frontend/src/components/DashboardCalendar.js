@@ -1,162 +1,171 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { Link } from 'react-router-dom';
-import axios from 'axios';
-import '../Dashboard.css';
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { Link } from "react-router-dom";
+import axios from "axios";
+import "../Dashboard.css";
+import Calendar from "../pages/Calendar";
 
 const DashboardCalendar = () => {
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(null);
   const [events, setEvents] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState('month'); // 'month', 'week', 'day'
+  const [viewMode, setViewMode] = useState("month"); // 'month', 'week', 'day'
   const [loading, setLoading] = useState(true);
 
   // Fetch projects
   useEffect(() => {
+    if (!user?.id) return;
     const fetchProjects = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/projects`);
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
+        );
         setProjects(response.data);
       } catch (error) {
-        console.error('Failed to fetch projects:', error);
-        // Mock data for demonstration
-        setProjects([
-          { id: 1, name: 'Website Redesign', owner: { firstName: 'John', lastName: 'Doe' } },
-          { id: 2, name: 'Mobile App', owner: { firstName: 'Jane', lastName: 'Smith' } },
-          { id: 3, name: 'Database Migration', owner: { firstName: 'Mike', lastName: 'Johnson' } }
-        ]);
+        console.error("Failed to fetch projects:", error);
       }
     };
     fetchProjects();
-  }, []);
+  }, [user]);
 
   // Fetch events/tasks for calendar
   useEffect(() => {
+    if (!projects || projects.length === 0) return;
     const fetchEvents = async () => {
-      setLoading(true);
-      try {
-        // Fetch tasks from all projects
-        const allEvents = [];
-        for (const project of projects) {
-          try {
-            const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/projects/${project.id}/backlog`);
-            const tasks = response.data.map(task => ({
-              ...task,
-              projectName: project.name,
-              projectId: project.id
-            }));
-            allEvents.push(...tasks);
-          } catch (error) {
-            console.error(`Failed to fetch tasks for project ${project.id}:`, error);
-          }
+      // Collect tasks from all projects then set events once
+      const allTasks = [];
+      for (const project of projects) {
+        try {
+          const response = await axios.get(
+            `${process.env.REACT_APP_API_URL}/api/projects/${project.id}/backlog`
+          );
+          const tasks = response.data.map((task) => ({
+            id: task.id,
+            title: task.title,
+            dueDate: task.dueDate, // Use dueDate for event date
+            assignedTo: task.assignedTo,
+            label: task.label,
+            priority: task.priority,
+            description: task.description,
+            status: task.status,
+            projectName: project.name,
+          }));
+          allTasks.push(...tasks);
+        } catch (error) {
+          console.error("Error fetching tasks:", error);
         }
-        setEvents(allEvents);
-      } catch (error) {
-        console.error('Failed to fetch events:', error);
-        // Mock data
-        setEvents([
-          {
-            id: 1,
-            title: 'Design Review Meeting',
-            dueDate: '2024-09-25',
-            status: 'In Progress',
-            priority: 'High',
-            projectName: 'Website Redesign',
-            projectId: 1,
-            assignedTo: 'John Doe'
-          },
-          {
-            id: 2,
-            title: 'API Integration',
-            dueDate: '2024-09-26',
-            status: 'To Do',
-            priority: 'Medium',
-            projectName: 'Mobile App',
-            projectId: 2,
-            assignedTo: 'Jane Smith'
-          },
-          {
-            id: 3,
-            title: 'Database Schema Update',
-            dueDate: '2024-09-27',
-            status: 'In Progress',
-            priority: 'High',
-            projectName: 'Database Migration',
-            projectId: 3,
-            assignedTo: 'Mike Johnson'
-          }
-        ]);
-      } finally {
-        setLoading(false);
       }
+      setEvents(allTasks);
+      setLoading(false);
     };
-
-    if (projects.length > 0) {
-      fetchEvents();
-    }
+    fetchEvents();
   }, [projects]);
 
   const getEventsForDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
-    return events.filter(event => event.dueDate === dateStr);
+    const dateStr = date.toISOString().split("T")[0];
+    return events.filter((event) => event.dueDate === dateStr);
   };
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'completed': return 'success';
-      case 'in progress': return 'warning';
-      case 'to do': return 'primary';
-      case 'stuck': return 'danger';
-      default: return 'secondary';
+      case "completed":
+        return "success";
+      case "in progress":
+        return "warning";
+      case "to do":
+        return "primary";
+      case "stuck":
+        return "danger";
+      default:
+        return "secondary";
     }
   };
 
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
-      case 'high': return 'danger';
-      case 'medium': return 'warning';
-      case 'low': return 'success';
-      default: return 'secondary';
+      case "high":
+        return "danger";
+      case "medium":
+        return "warning";
+      case "low":
+        return "success";
+      default:
+        return "secondary";
     }
   };
+
+  // basic hashing function to choose color. it's pretty bad, but for now it will do.
+  const getProjectColor = (projectId) =>{
+    const PROJECT_COLORS = [     
+      "#198754", // success
+      "#ffc107", // warning
+      "#dc3545", // danger
+      "#43729cff", // secondary
+      "#6610f2", // purple
+      "#fd5a14ff", // orange
+    ];
+
+    if (!projectId) return PROJECT_COLORS[0];
+    let sum = 0
+    for (let i = 0; i < projectId.length; i++){
+      sum += projectId.charCodeAt(i);
+    }
+    return PROJECT_COLORS[sum % PROJECT_COLORS.length];
+  }
+
 
   const renderCalendarGrid = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    
+
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     const startingDay = firstDay.getDay();
-
-    const days = [];
     
+    const days = [];
+
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDay; i++) {
       days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
     }
-    
+
     // Add days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
       const dayEvents = getEventsForDate(date);
       const isToday = date.toDateString() === new Date().toDateString();
-      
+
       days.push(
-        <div 
-          key={day} 
-          className={`calendar-day ${isToday ? 'today' : ''} ${dayEvents.length > 0 ? 'has-events' : ''}`}
+        <div
+          key={day}
+          className={`calendar-day ${isToday ? "today" : ""} ${
+            dayEvents.length > 0 ? "has-events" : ""
+          }`}
         >
-          <div className="day-number">{day}</div>
-          <div className="day-events">
-            {dayEvents.slice(0, 3).map(event => (
-              <div 
+          <div
+            className={`day-number ${
+              isToday
+                && `bg-${getStatusColor("to do")} text-light`
+                
+            }`}
+          >
+            {day}
+          </div>
+          {/* <div className="day-number ">{day}</div> */}
+
+          <div className="">
+            {dayEvents.slice(0, 3).map((event) => (
+              <div
                 key={event.id}
-                className={`event-dot bg-${getStatusColor(event.status)}`}
+                className={` rounded text-light day-events`}
+                style={{
+                  "backgroundColor": getProjectColor(event.projectName),
+                  
+                }}
                 title={`${event.title} - ${event.projectName}`}
-              ></div>
+              >{`${event.title} - ${event.projectName}`}</div>
             ))}
             {dayEvents.length > 3 && (
               <div className="more-events">+{dayEvents.length - 3}</div>
@@ -165,9 +174,27 @@ const DashboardCalendar = () => {
         </div>
       );
     }
-    
     return days;
   };
+
+  // INCOMPLETE (I don't think we need this or the day view)
+ const renderWeekView = () => {
+   const year = currentDate.getFullYear();
+   const month = currentDate.getMonth();
+
+   const firstDay = new Date(year, month, 1);
+   const lastDay = new Date(year, month + 1, 0);
+   const daysInMonth = lastDay.getDate();
+   const startingDay = firstDay.getDay();
+
+   const days = [];
+
+   // Add empty cells for days before the first day of the month
+   for (let i = 0; i < startingDay; i++) {
+     days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
+   }
+
+ };
 
   const navigateMonth = (direction) => {
     const newDate = new Date(currentDate);
@@ -179,36 +206,41 @@ const DashboardCalendar = () => {
 
   return (
     <React.Fragment>
-    <div className="d-flex flex-column min-vh-100">
-
-
-
-      {/* Main Content */}
-      <div className="flex-grow-1 container mt-4">
+      <div className="d-flex flex-column min-vh-100">
+        {/* Main Content */}
+        <div className="flex-grow-1 container mt-4">
           {/* Header */}
           <div className="d-flex justify-content-between align-items-center mb-4">
             <div>
               <h1 className="h3 mb-1">Calendar</h1>
-              <p className="text-muted mb-0">View your tasks and deadlines in a calendar format.</p>
+              <p className="text-muted mb-0">
+                View your tasks and deadlines in a calendar format.
+              </p>
             </div>
             <div className="d-flex align-items-center gap-3">
               {/* View Mode Toggle */}
               <div className="btn-group" role="group">
-                <button 
-                  className={`btn btn-sm ${viewMode === 'month' ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => setViewMode('month')}
+                <button
+                  className={`btn btn-sm ${
+                    viewMode === "month" ? "btn-primary" : "btn-outline-primary"
+                  }`}
+                  onClick={() => setViewMode("month")}
                 >
                   Month
                 </button>
-                <button 
-                  className={`btn btn-sm ${viewMode === 'week' ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => setViewMode('week')}
+                <button
+                  className={`btn btn-sm ${
+                    viewMode === "week" ? "btn-primary" : "btn-outline-primary"
+                  }`}
+                  onClick={() => setViewMode("week")}
                 >
                   Week
                 </button>
-                <button 
-                  className={`btn btn-sm ${viewMode === 'day' ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => setViewMode('day')}
+                <button
+                  className={`btn btn-sm ${
+                    viewMode === "day" ? "btn-primary" : "btn-outline-primary"
+                  }`}
+                  onClick={() => setViewMode("day")}
                 >
                   Day
                 </button>
@@ -223,22 +255,25 @@ const DashboardCalendar = () => {
                 <div className="card-header bg-white border-bottom-0">
                   <div className="d-flex justify-content-between align-items-center">
                     <h5 className="mb-0">
-                      {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      {currentDate.toLocaleDateString("en-US", {
+                        month: "long",
+                        year: "numeric",
+                      })}
                     </h5>
                     <div className="d-flex align-items-center gap-2">
-                      <button 
+                      <button
                         className="btn btn-sm btn-outline-secondary"
                         onClick={() => navigateMonth(-1)}
                       >
                         <i className="bi bi-chevron-left"></i>
                       </button>
-                      <button 
+                      <button
                         className="btn btn-sm btn-outline-secondary"
                         onClick={() => setCurrentDate(new Date())}
                       >
                         Today
                       </button>
-                      <button 
+                      <button
                         className="btn btn-sm btn-outline-secondary"
                         onClick={() => navigateMonth(1)}
                       >
@@ -250,17 +285,31 @@ const DashboardCalendar = () => {
                 <div className="card-body p-0">
                   {/* Calendar Grid */}
                   <div className="calendar-grid">
-                    <div className="calendar-header">
-                      <div className="calendar-day-header">Sun</div>
-                      <div className="calendar-day-header">Mon</div>
-                      <div className="calendar-day-header">Tue</div>
-                      <div className="calendar-day-header">Wed</div>
-                      <div className="calendar-day-header">Thu</div>
-                      <div className="calendar-day-header">Fri</div>
-                      <div className="calendar-day-header">Sat</div>
-                    </div>
+                    {viewMode === "month" && (
+                      <div className="calendar-header">
+                        <div className="calendar-day-header">Sun</div>
+                        <div className="calendar-day-header">Mon</div>
+                        <div className="calendar-day-header">Tue</div>
+                        <div className="calendar-day-header">Wed</div>
+                        <div className="calendar-day-header">Thu</div>
+                        <div className="calendar-day-header">Fri</div>
+                        <div className="calendar-day-header">Sat</div>
+                      </div>
+                    )}
+                    {viewMode === "week" && (
+                      <div className="calendar-header">
+                        <div className="calendar-day-header">Sun</div>
+                        <div className="calendar-day-header">Mon</div>
+                        <div className="calendar-day-header">Tue</div>
+                        <div className="calendar-day-header">Wed</div>
+                        <div className="calendar-day-header">Thu</div>
+                        <div className="calendar-day-header">Fri</div>
+                        <div className="calendar-day-header">Sat</div>
+                      </div>
+                    )}
                     <div className="calendar-body">
-                      {renderCalendarGrid()}
+                      {viewMode === "month" && renderCalendarGrid()}
+                      {viewMode === "week" && renderWeekView()}
                     </div>
                   </div>
                 </div>
@@ -276,7 +325,10 @@ const DashboardCalendar = () => {
                 <div className="card-body">
                   {loading ? (
                     <div className="text-center py-3">
-                      <div className="spinner-border spinner-border-sm text-primary" role="status">
+                      <div
+                        className="spinner-border spinner-border-sm text-primary"
+                        role="status"
+                      >
                         <span className="visually-hidden">Loading...</span>
                       </div>
                     </div>
@@ -287,22 +339,52 @@ const DashboardCalendar = () => {
                     </div>
                   ) : (
                     <div className="list-group list-group-flush">
-                      {todayEvents.map(event => (
-                        <div key={event.id} className="list-group-item px-0 border-0">
+                      {todayEvents.map((event) => (
+                        <div
+                          key={event.id}
+                          className="card rounded-3 p-3"
+                          style={{
+                            borderLeft: "6px solid #bdc7d2ff",
+                          }}
+                        >
                           <div className="d-flex align-items-start">
                             <div className="flex-shrink-0">
-                              <div className={`badge bg-${getStatusColor(event.status)} me-2`}>
+                              <div
+                                className={`badge bg-${getStatusColor(
+                                  event.status
+                                )} me-2`}
+                              >
                                 {event.status}
                               </div>
                             </div>
                             <div className="flex-grow-1">
-                              <h6 className="mb-1">{event.title}</h6>
-                              <p className="mb-1 text-muted small">{event.projectName}</p>
+                              <strong className="mb-1 text-muted medium">
+                                {event.title}
+                              </strong>
+                              <p className="mb-1 text-muted medium">
+                                {event.projectName}
+                              </p>
                               <div className="d-flex align-items-center justify-content-between">
-                                <small className="text-muted">{event.assignedTo}</small>
-                                <span className={`badge bg-${getPriorityColor(event.priority)}`}>
+                                <div className="mb-1">
+                                  <strong>Assigned to:</strong>
+                                  <div className="mb-1 text-muted small">
+                                    {event.assignedTo}
+                                  </div>
+                                </div>
+
+                                <span
+                                  className={`badge bg-${getPriorityColor(
+                                    event.priority
+                                  )}`}
+                                >
                                   {event.priority}
                                 </span>
+                              </div>
+                              <div className="align-items-center">
+                                <strong>Description:</strong>
+                                <p className="text-muted">
+                                  {event.description}
+                                </p>
                               </div>
                             </div>
                           </div>
@@ -320,7 +402,7 @@ const DashboardCalendar = () => {
                 </div>
                 <div className="card-body">
                   {events
-                    .filter(event => {
+                    .filter((event) => {
                       const eventDate = new Date(event.dueDate);
                       const today = new Date();
                       const nextWeek = new Date(today);
@@ -329,20 +411,39 @@ const DashboardCalendar = () => {
                     })
                     .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
                     .slice(0, 5)
-                    .map(event => (
-                      <div key={event.id} className="d-flex align-items-center mb-3">
+                    .map((event) => (
+                      <div
+                        key={event.id}
+                        className="d-flex align-items-center mb-3"
+                      >
                         <div className="flex-shrink-0">
-                          <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" 
-                               style={{ width: '32px', height: '32px', fontSize: '12px' }}>
+                          <div
+                            // uses event status for the color of the circle around upcoming task
+                            className={`bg-${getStatusColor(
+                              event.status
+                            )} text-white rounded-circle d-flex align-items-center justify-content-center`}
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              fontSize: "12px",
+                            }}
+                          >
                             {new Date(event.dueDate).getDate()}
                           </div>
                         </div>
                         <div className="flex-grow-1 ms-3">
                           <h6 className="mb-0 small">{event.title}</h6>
-                          <small className="text-muted">{event.projectName}</small>
+                          <small className="text-muted">
+                            {event.projectName}
+                          </small>
                         </div>
                         <div className="flex-shrink-0">
-                          <span className={`badge bg-${getPriorityColor(event.priority)}`}>
+                          <span
+                            // uses event priority for the color of the badge
+                            className={`badge bg-${getPriorityColor(
+                              event.priority
+                            )}`}
+                          >
                             {event.priority}
                           </span>
                         </div>
@@ -353,12 +454,7 @@ const DashboardCalendar = () => {
             </div>
           </div>
         </div>
-
-      {/* Footer */}
-      <footer className="footer bg-light text-center py-3 mt-auto">
-        <small>&copy; {new Date().getFullYear()} TeamWorks. Seongjun, Jimbert, Gary.</small>
-      </footer>
-    </div>
+      </div>
     </React.Fragment>
   );
 };
