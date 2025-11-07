@@ -94,13 +94,12 @@
 }
 
 
-
 .calendar-day:hover {
   background-color: #f8f9fa;
 }
 
 .day-number {
-  /* size: responsive but bounded */
+  /* size: responsive, makes sure the circle isn't too big or too small */
     width: clamp(20px, 2vw, 25px);
     height: clamp(20px, 2vw, 25px);
   
@@ -109,8 +108,9 @@
     align-items: center;
     justify-content: center;
   
-    margin: 0 auto 6px;
     /* center horizontally inside the calendar cell */
+    margin: 0 auto 6px;
+    
     font-weight: 600;
     font-size: 0.9rem;
     line-height: 1;
@@ -119,24 +119,37 @@
     border-radius: 50%;
     
     /* keeps border inside width/height */
-    box-sizing: border-box;
-  
-    /* color of the number */
-    /* color: #ffffff; */
-  
-    /* If you rely on dynamic bg-* classes (e.g. bg-warning), keep them;
-       otherwise set a default background here */
-    background-clip: padding-box;
+    box-sizing: border-box;  
+
     /* prevents border overlap */
+    background-clip: padding-box;   
 }
 
-.day-events {
-    
-   display: inline-block;
+.calendar-day {
+  min-width: 0; /* for flex/grid children */
+  
+  overflow: hidden; /* prevents growth when children overflow */
+  
+  box-sizing: border-box;  
+  min-height: 100px;
+  border-right: 1px solid #dee2e6;
+  border-bottom: 1px solid #dee2e6;
+  padding: 8px;
+  position: relative;
+  background-color: white;
+  transition: background-color 0.2s ease;
+}
 
-  overflow: hidden;
-    /* hide overflow */
+
+.day-events {    
+  display: block;
+    width: 100%; /* constrain width to the parent cell */
+    padding: 1px 3px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
     text-overflow: ellipsis;
+    box-sizing: border-box;
 }
 
 

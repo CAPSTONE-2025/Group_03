@@ -3,6 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import "../Dashboard.css";
+import Calendar from "../pages/Calendar";
 
 const DashboardCalendar = () => {
   const { user } = useAuth();
@@ -94,6 +95,26 @@ const DashboardCalendar = () => {
     }
   };
 
+  // basic hashing function to choose color. it's pretty bad, but for now it will do.
+  const getProjectColor = (projectId) =>{
+    const PROJECT_COLORS = [     
+      "#198754", // success
+      "#ffc107", // warning
+      "#dc3545", // danger
+      "#43729cff", // secondary
+      "#6610f2", // purple
+      "#fd5a14ff", // orange
+    ];
+
+    if (!projectId) return PROJECT_COLORS[0];
+    let sum = 0
+    for (let i = 0; i < projectId.length; i++){
+      sum += projectId.charCodeAt(i);
+    }
+    return PROJECT_COLORS[sum % PROJECT_COLORS.length];
+  }
+
+
   const renderCalendarGrid = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -102,7 +123,7 @@ const DashboardCalendar = () => {
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     const startingDay = firstDay.getDay();
-
+    
     const days = [];
 
     // Add empty cells for days before the first day of the month
@@ -126,8 +147,8 @@ const DashboardCalendar = () => {
           <div
             className={`day-number ${
               isToday
-                ? `bg-${getStatusColor("to do")} text-light`
-                : "day-number"
+                && `bg-${getStatusColor("to do")} text-light`
+                
             }`}
           >
             {day}
@@ -138,9 +159,11 @@ const DashboardCalendar = () => {
             {dayEvents.slice(0, 3).map((event) => (
               <div
                 key={event.id}
-                className={`bg-${getStatusColor(
-                  event.status
-                )} rounded text-light day-events`}
+                className={` rounded text-light day-events`}
+                style={{
+                  "backgroundColor": getProjectColor(event.projectName),
+                  
+                }}
                 title={`${event.title} - ${event.projectName}`}
               >{`${event.title} - ${event.projectName}`}</div>
             ))}
@@ -153,6 +176,8 @@ const DashboardCalendar = () => {
     }
     return days;
   };
+
+  // INCOMPLETE (I don't think we need this or the day view)
  const renderWeekView = () => {
    const year = currentDate.getFullYear();
    const month = currentDate.getMonth();
@@ -393,7 +418,10 @@ const DashboardCalendar = () => {
                       >
                         <div className="flex-shrink-0">
                           <div
-                            className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
+                            // uses event status for the color of the circle around upcoming task
+                            className={`bg-${getStatusColor(
+                              event.status
+                            )} text-white rounded-circle d-flex align-items-center justify-content-center`}
                             style={{
                               width: "32px",
                               height: "32px",
@@ -411,6 +439,7 @@ const DashboardCalendar = () => {
                         </div>
                         <div className="flex-shrink-0">
                           <span
+                            // uses event priority for the color of the badge
                             className={`badge bg-${getPriorityColor(
                               event.priority
                             )}`}
