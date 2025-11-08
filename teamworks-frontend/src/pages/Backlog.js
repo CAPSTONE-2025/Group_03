@@ -33,6 +33,7 @@ function Backlog() {
   const [isEditing, setIsEditing] = useState(false);
   const [projectName, setProjectName] = useState("");
 
+  const [projectStatus, setProjectStatus] = useState("Active"); // <-- NEW
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
 
@@ -89,7 +90,7 @@ function Backlog() {
     : null;
 
   // -------------------- EFFECTS --------------------
-  // Project name + members
+  // Project name + members + current status
   useEffect(() => {
     if (!projectId) return;
 
@@ -99,8 +100,9 @@ function Backlog() {
           `${process.env.REACT_APP_API_URL}/api/project/${projectId}`
         );
         setProjectName(pres.data.name);
-        const memberIds = pres.data.members || [];
+        setProjectStatus(pres.data.status || "Active");
 
+        const memberIds = pres.data.members || [];
         const ures = await axios.get(`${process.env.REACT_APP_API_URL}/api/users`);
         const allUsers = Array.isArray(ures.data) ? ures.data : [];
         const onlyMembers = allUsers.filter((u) => memberIds.includes(String(u.id)));
@@ -209,9 +211,26 @@ function Backlog() {
     }
   };
 
+  // 🔁 Project status change (Active / Completed)
+  const handleProjectStatusChange = async (e) => {
+    const newStatus = e.target.value;
+    try {
+      await axios.patch(
+        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/status`,
+        { status: newStatus }
+      );
+      setProjectStatus(newStatus);
+    } catch (err) {
+      console.error("Failed to update project status:", err);
+      alert(err.response?.data?.error || "Failed to update status");
+    }
+  };
+
   // -------------------- LOADING & ERROR --------------------
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error.message}</div>;
+
+  const isCompleted = (projectStatus || "").toLowerCase() === "completed";
 
   // -------------------- RENDER --------------------
   return (
@@ -223,14 +242,41 @@ function Backlog() {
             Backlog Board {projectName ? <span className="text-muted">– {projectName}</span> : null}
           </h3>
 
-          {/* Controls */}
-          <div className="d-flex align-items-center mb-2">
-            <div className="ms-auto">
-              <button className="btn btn-outline-secondary" onClick={openInvite}>
+          {/* Controls: status selector (right) + Invite button */}
+          <div className="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              {pendingInvites.length > 0 ? (
+                <small className="text-muted">
+                  Pending invites: {pendingInvites.map((p) => p.email).join(", ")}
+                </small>
+              ) : (
+                <small className="text-muted">No pending invites</small>
+              )}
+            </div>
+
+            <div className="d-flex align-items-center gap-2">
+              <select
+                className="form-select form-select-sm"
+                value={projectStatus}
+                onChange={handleProjectStatusChange}
+                style={{ width: 160 }}
+                title="Project Status"
+              >
+                <option value="Active">Active</option>
+                <option value="Completed">Completed</option>
+              </select>
+
+              <button className="btn btn-outline-secondary ms-2" onClick={openInvite}>
                 Invite Members
               </button>
             </div>
           </div>
+
+          {isCompleted && (
+            <div className="alert alert-info py-2 mb-3">
+              This project is marked as <strong>Completed</strong>. Task creation is disabled.
+            </div>
+          )}
 
           <table className="table table-striped table-hover">
             <thead>
@@ -275,15 +321,29 @@ function Backlog() {
           <div className="d-flex justify-content-end">
             <button
               className="btn btn-primary me-2"
+              disabled={isCompleted}
               onClick={() => {
                 setShowForm(true);
                 setShowTaskForm(false);
                 setSelectedTask(null);
               }}
+              title={isCompleted ? "Project is completed. Adding is disabled." : ""}
             >
               Add
             </button>
-            <button className="btn btn-danger" onClick={handleDeleteTask}>
+
+            <button
+              className="btn btn-danger"
+              disabled={isCompleted || !selectedTaskId}
+              onClick={handleDeleteTask}
+              title={
+                isCompleted
+                  ? "Project is completed. Deleting is disabled."
+                  : !selectedTaskId
+                  ? "Select a task to delete."
+                  : ""
+              }
+            >
               Delete
             </button>
           </div>

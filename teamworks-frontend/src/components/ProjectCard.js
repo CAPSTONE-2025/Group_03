@@ -3,23 +3,24 @@ import { Link } from 'react-router-dom';
 
 const ProjectCard = ({ project, onSelectProject, onEditProject, onDeleteProject, onChangeOwner }) => {
   const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'active': return 'success';
-      case 'in progress': return 'warning';
-      case 'completed': return 'info';
-      case 'on hold': return 'secondary';
-      default: return 'primary';
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'high': return 'danger';
-      case 'medium': return 'warning';
-      case 'low': return 'success';
+    switch ((status || '').toLowerCase()) {
+      case 'active': return 'primary';
+      case 'completed': return 'success';
       default: return 'secondary';
     }
   };
+
+  const ownerDisplay =
+    project.ownerName ||
+    project.ownerFullName || // if you inject this in the list call
+    project.ownerEmail ||    // or this
+    'Owner';
+
+  const ownerInitial =
+    (ownerDisplay && ownerDisplay[0]) ||
+    'O';
+
+  const memberCount = Array.isArray(project.members) ? project.members.length : (project.memberCount ?? 1);
 
   return (
     <div className="col-md-6 col-lg-4 mb-4">
@@ -37,20 +38,17 @@ const ProjectCard = ({ project, onSelectProject, onEditProject, onDeleteProject,
         }}
       >
         <div className="card-body">
-          {/* Project Header */}
+          {/* Header */}
           <div className="d-flex justify-content-between align-items-start mb-3">
             <div className="flex-grow-1">
-              <h5
-                className="card-title mb-1 text-truncate"
-                title={project.name}
-              >
+              <h5 className="card-title mb-1 text-truncate" title={project.name}>
                 {project.name}
               </h5>
               <small className="text-muted">
-                Created{" "}
-                {new Date(project.createdAt || Date.now()).toLocaleDateString()}
+                Created {new Date(project.createdAt || Date.now()).toLocaleDateString()}
               </small>
             </div>
+
             <div className="dropdown">
               <button
                 className="btn btn-link p-0"
@@ -71,7 +69,6 @@ const ProjectCard = ({ project, onSelectProject, onEditProject, onDeleteProject,
                     <i className="bi bi-pencil me-2"></i>Edit Project
                   </button>
                 </li>
-
                 <li>
                   <button
                     className="dropdown-item"
@@ -80,18 +77,15 @@ const ProjectCard = ({ project, onSelectProject, onEditProject, onDeleteProject,
                       onChangeOwner(project);
                     }}
                   >
-                    <i className="bi bi-pencil me-2"></i>Change Project Owner
+                    <i className="bi bi-person-gear me-2"></i>Change Project Owner
                   </button>
                 </li>
-
                 <li>
-                  <button className="dropdown-item">
+                  <button className="dropdown-item" onClick={(e) => e.stopPropagation()}>
                     <i className="bi bi-people me-2"></i>Manage Members
                   </button>
                 </li>
-                <li>
-                  <hr className="dropdown-divider" />
-                </li>
+                <li><hr className="dropdown-divider" /></li>
                 <li>
                   <button
                     className="dropdown-item text-danger"
@@ -107,7 +101,7 @@ const ProjectCard = ({ project, onSelectProject, onEditProject, onDeleteProject,
             </div>
           </div>
 
-          {/* Project Description */}
+          {/* Description */}
           {project.description && (
             <p className="card-text text-muted small mb-3">
               {project.description.length > 100
@@ -116,66 +110,33 @@ const ProjectCard = ({ project, onSelectProject, onEditProject, onDeleteProject,
             </p>
           )}
 
-          {/* Project Stats */}
-          <div className="row g-2 mb-3">
-            <div className="col-4">
-              <div className="text-center">
-                <div className="h6 mb-0 text-primary">
-                  {project.taskCount || 0}
-                </div>
-                <small className="text-muted">Tasks</small>
-              </div>
-            </div>
-            <div className="col-4">
-              <div className="text-center">
-                <div className="h6 mb-0 text-success">
-                  {project.completedTasks || 0}
-                </div>
-                <small className="text-muted">Completed</small>
-              </div>
-            </div>
-            <div className="col-4">
-              <div className="text-center">
-                <div className="h6 mb-0 text-warning">
-                  {project.memberCount || 1}
-                </div>
-                <small className="text-muted">Members</small>
-              </div>
-            </div>
-          </div>
-
-          {/* Project Status and Priority */}
+          {/* Status + Members */}
           <div className="d-flex justify-content-between align-items-center mb-3">
             <span className={`badge bg-${getStatusColor(project.status)}`}>
-              {project.status || "Active"}
+              {project.status || 'Active'}
             </span>
-            <span className={`badge bg-${getPriorityColor(project.priority)}`}>
-              {project.priority || "Medium"}
-            </span>
+
+            <div className="d-flex align-items-center">
+              <i className="bi bi-people me-1"></i>
+              <small className="text-muted">{memberCount} member{memberCount === 1 ? '' : 's'}</small>
+            </div>
           </div>
 
-          {/* Project Owner */}
+          {/* Owner + Quick actions */}
           <div className="d-flex align-items-center justify-content-between">
             <div className="d-flex align-items-center">
               <div
                 className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2"
                 style={{ width: "28px", height: "28px", fontSize: "12px" }}
               >
-                {project.owner?.firstName?.charAt(0) ||
-                  project.createdBy?.charAt(0) ||
-                  "U"}
+                {ownerInitial}
               </div>
               <div>
-                <div className="small fw-semibold">
-                  {project.owner?.firstName
-                    ? `${project.owner.firstName} ${project.owner.lastName}`
-                    : project.createdBy || "Unknown"}
-                </div>
+                <div className="small fw-semibold">{ownerDisplay}</div>
                 <div className="small text-muted">Owner</div>
               </div>
             </div>
 
-            {/* Quick Actions */}
             <div className="d-flex gap-1">
               <Link
                 to={`/projects/${project.id}/backlog`}
@@ -197,29 +158,12 @@ const ProjectCard = ({ project, onSelectProject, onEditProject, onDeleteProject,
           </div>
         </div>
 
-        {/* Project Footer */}
+        {/* Footer: Due date only */}
         <div className="card-footer bg-transparent border-top-0 pt-0">
-          <div className="d-flex justify-content-between align-items-center">
+          <div className="d-flex justify-content-end align-items-center">
             <small className="text-muted">
-              Due:{" "}
-              {project.dueDate
-                ? new Date(project.dueDate).toLocaleDateString()
-                : "No due date"}
+              Due: {project.dueDate ? new Date(project.dueDate).toLocaleDateString() : 'No due date'}
             </small>
-            <div className="d-flex align-items-center">
-              <div
-                className="progress me-2"
-                style={{ width: "60px", height: "4px" }}
-              >
-                <div
-                  className="progress-bar bg-success"
-                  style={{ width: `${project.completionPercentage || 0}%` }}
-                ></div>
-              </div>
-              <small className="text-muted">
-                {project.completionPercentage || 0}%
-              </small>
-            </div>
           </div>
         </div>
       </div>

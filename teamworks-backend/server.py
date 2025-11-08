@@ -27,6 +27,7 @@ def create_project():
         "owner": ObjectId(data["createdBy"]),  
         "members": [ObjectId(data["createdBy"])],
         "pendingInvites": [],
+        "status": "Active",
         "createdAt": datetime.now(),
         "updatedAt": datetime.now(),
     }
@@ -47,6 +48,7 @@ def list_user_projects(user_id):
             "members": [str(member) for member in p["members"]],
             "createdAt": p["createdAt"].isoformat() if isinstance(p["createdAt"], datetime) else str(p["createdAt"]),
             "updatedAt": p["updatedAt"].isoformat() if isinstance(p["updatedAt"], datetime) else str(p["updatedAt"]),
+            "status": p.get("status", "Active"),
         })
     return jsonify(projects)
 
@@ -62,6 +64,7 @@ def get_project(project_id):
         "createdBy": str(p.get("createdBy")) if p.get("createdBy") else None,
         "owner": str(p.get("owner")) if p.get("owner") else None,
         "members": [str(m) for m in p.get("members", [])],
+        "status": p.get("status", "Active"),
     })
 
 
@@ -100,6 +103,23 @@ def require_project_owner(fn):
 
     return wrapper
 
+# --------------------  ---------------------
+
+@app.route("/api/projects/<project_id>/status", methods=["PATCH"])
+@require_project_owner
+def update_project_status(project_id):
+    data = request.json or {}
+    new_status = (data.get("status") or "").strip()
+    if new_status not in ("Active", "Completed"):
+        return jsonify({"error": "status must be 'Active' or 'Completed'"}), 400
+
+    res = get_projects_collection().update_one(
+        {"_id": ObjectId(project_id)},
+        {"$set": {"status": new_status, "updatedAt": datetime.utcnow()}}
+    )
+    if res.matched_count == 0:
+        return jsonify({"error": "Project not found"}), 404
+    return jsonify({"message": "Status updated", "status": new_status}), 200
 
 # -------------------- PROJECT INVITE ---------------------
 # @app.route('/api/projects/<project_id>/invite', methods=['POST'])
@@ -334,34 +354,47 @@ def change_name(project_id):
 @require_project_owner
 def change_owner(project_id):
     data = request.json
-    # get new project name from front-end form field, not through url params
-    new_owner_email = data.get("ownerEmail") 
+    new_owner_email = (data.get("ownerEmail") or "").strip().lower()
     if not new_owner_email:
-        return jsonify({"error": "owner is required"}), 400
+        return jsonify({"error": "ownerEmail is required"}), 400
 
-    try:
-        user = get_users_collection().find_one(
-            {"email": new_owner_email},          
-        )
-    except Exception:
+    users = get_users_collection()
+    projects = get_projects_collection()
+
+    # Find the new owner user
+    user = users.find_one({"email": new_owner_email})
+    if not user:
         return jsonify({"error": "User not found"}), 404
 
-    try:
-        result = get_projects_collection().update_one(
-            {"_id": ObjectId(project_id)},
-            {
-                "$set": {
-                    "owner": ObjectId(user["_id"]),
-                    "ownerEmail": new_owner_email,
-                },  # set new owner
-                "$addToSet": {"members": ObjectId(user["_id"])},
-            },
-        )
-    except Exception:
-        return jsonify({"error": "Cannot update owner with new owner"}), 404
+    # Load project with current members
+    proj = projects.find_one({"_id": ObjectId(project_id)}, {"members": 1, "owner": 1})
+    if not proj:
+        return jsonify({"error": "Project not found"}), 404
 
-    if result.modified_count == 0:
-        return jsonify({"error": "Owner already owns project"}), 304  # 304 (Not Modified)
+    # Enforce: new owner must already be a member
+    user_id = user["_id"]
+    is_member = any(str(m) == str(user_id) for m in proj.get("members", []))
+    if not is_member:
+        return jsonify({"error": "New owner must already be a project member."}), 400
+
+    # If already owner, short-circuit
+    if str(proj.get("owner")) == str(user_id):
+        return jsonify({"error": "User is already the project owner."}), 304
+
+    # Update owner only (do NOT add to members here)
+    result = projects.update_one(
+        {"_id": ObjectId(project_id)},
+        {
+            "$set": {
+                "owner": ObjectId(user_id),
+                "ownerEmail": new_owner_email,
+                "updatedAt": datetime.utcnow()
+            }
+        }
+    )
+
+    if result.matched_count == 0:
+        return jsonify({"error": "Project not found"}), 404
 
     return jsonify({"message": "Project owner updated"}), 200
 

@@ -22,8 +22,9 @@ const DashboardHome = () => {
   const [newOwner, setOwner] = useState("");
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("grid");
+  const [memberOptionsForOwner, setMemberOptionsForOwner] = useState([]); // [{id, name, email}]
 
-  // Fetch projects
+  // Fetch projects + users (for owner names)
   useEffect(() => {
     const fetchProjects = async () => {
       if (!user?.id) {
@@ -32,19 +33,27 @@ const DashboardHome = () => {
         return;
       }
       try {
-        const response = await axios.get(
-          `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
-        );
-        const transformed = (response.data || []).map((project) => ({
-          ...project,
-          owner: { firstName: user?.firstName, lastName: user?.lastName },
-          taskCount: 0,
-          completedTasks: 0,
-          memberCount: 1,
-          completionPercentage: 0,
-          dueDate: "2024-12-31",
-          createdAt: new Date().toISOString().split("T")[0],
+        const [projRes, usersRes] = await Promise.all([
+          axios.get(`${process.env.REACT_APP_API_URL}/api/projects/${user.id}`),
+          axios.get(`${process.env.REACT_APP_API_URL}/api/users`)
+        ]);
+
+        const users = Array.isArray(usersRes.data) ? usersRes.data : [];
+        const uById = users.reduce((acc, u) => {
+          acc[u.id] = { name: u.name, email: u.email };
+          return acc;
+        }, {});
+
+        const transformed = (projRes.data || []).map((p) => ({
+          ...p,
+          // attach ownerName/email if we can
+          ownerName: uById[p.owner]?.name,
+          ownerEmail: uById[p.owner]?.email,
+          // memberCount directly from members list length (real data)
+          memberCount: Array.isArray(p.members) ? p.members.length : 1,
+          // keep createdAt as-is (server provides iso)
         }));
+
         setProjects(transformed);
       } catch (error) {
         console.error("Failed to fetch projects:", error);
@@ -54,30 +63,31 @@ const DashboardHome = () => {
       }
     };
     fetchProjects();
-  }, [user?.id, user?.firstName, user?.lastName]);
+  }, [user?.id]);
 
   // Open "Create Project" modal from navbar link /?new=1
   useEffect(() => {
     if (searchParams.get("new") === "1") {
       setShowCreateProject(true);
-      // Clean the URL so refresh/back doesn’t reopen the modal
       navigate(location.pathname, { replace: true });
     }
   }, [searchParams, navigate, location.pathname]);
 
   const refreshProjectsForUser = async () => {
-    const projectsResponse = await axios.get(
-      `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
-    );
-    const transformed = (projectsResponse.data || []).map((project) => ({
-      ...project,
-      owner: { firstName: user?.firstName, lastName: user?.lastName },
-      taskCount: 0,
-      completedTasks: 0,
-      memberCount: 1,
-      completionPercentage: 0,
-      dueDate: "2024-12-31",
-      createdAt: new Date().toISOString().split("T")[0],
+    const [projRes, usersRes] = await Promise.all([
+      axios.get(`${process.env.REACT_APP_API_URL}/api/projects/${user.id}`),
+      axios.get(`${process.env.REACT_APP_API_URL}/api/users`)
+    ]);
+    const users = Array.isArray(usersRes.data) ? usersRes.data : [];
+    const uById = users.reduce((acc, u) => {
+      acc[u.id] = { name: u.name, email: u.email };
+      return acc;
+    }, {});
+    const transformed = (projRes.data || []).map((p) => ({
+      ...p,
+      ownerName: uById[p.owner]?.name,
+      ownerEmail: uById[p.owner]?.email,
+      memberCount: Array.isArray(p.members) ? p.members.length : 1,
     }));
     setProjects(transformed);
   };
@@ -92,22 +102,15 @@ const DashboardHome = () => {
         createdBy: user.id,
         description: "",
         status: "Active",
-        priority: "Medium",
       });
 
       await refreshProjectsForUser();
       setNewProjectName("");
       setShowCreateProject(false);
-
-      // Tell navbar to refresh immediately
       window.dispatchEvent(new Event("projects:refresh"));
     } catch (error) {
       console.error("Failed to create project:", error);
-      alert(
-        `Failed to create project: ${
-          error.response?.data?.error || error.message
-        }`
-      );
+      alert(`Failed to create project: ${error.response?.data?.error || error.message}`);
     }
   };
 
@@ -119,14 +122,38 @@ const DashboardHome = () => {
     setShowEditProject(true);
   };
 
-  
-  const handleChangeOwner = (project) => {
-    if (!user?.id) return;
+const handleChangeOwner = async (project) => {
+  if (!user?.id) return;
+  try {
+    // fetch project to get member IDs
+    const pres = await axios.get(`${process.env.REACT_APP_API_URL}/api/project/${project.id}`);
+    const memberIds = pres.data?.members || [];
+
+    // fetch all users to map IDs -> names/emails
+    const ures = await axios.get(`${process.env.REACT_APP_API_URL}/api/users`);
+    const allUsers = Array.isArray(ures.data) ? ures.data : [];
+
+    const options = allUsers
+      .filter(u => memberIds.includes(String(u.id)))
+      .map(u => ({
+        id: String(u.id),
+        name: u.name || u.email,
+        email: u.email
+      }));
+
+    setMemberOptionsForOwner(options);
     setEditingProject(project);
-    setOwner(project.ownerEmail || ""); // re-uses your existing newOwner/setOwner state
-    setOwnerEmailInput(project.ownerEmail || "");
+
+    // if existing ownerEmail is still in members, pre-select; else empty
+    const preselected = options.find(o => o.email === project.ownerEmail)?.email || "";
+    setOwnerEmailInput(preselected);
+
     setShowChangeOwner(true);
-  };
+  } catch (err) {
+    console.error("Failed to load project members for change owner:", err);
+    alert("Could not load members for this project.");
+  }
+};
 
   const handleUpdateOwner = async (e) => {
     e?.preventDefault?.();
@@ -143,10 +170,7 @@ const DashboardHome = () => {
       setShowChangeOwner(false);
       setEditingProject(null);
       setOwner("");
-      setOwnerEmailInput("");      
-      await refreshProjectsForUser();
-
-      // Tell navbar to refresh immediately
+      setOwnerEmailInput("");
       window.dispatchEvent(new Event("projects:refresh"));
     } catch (error) {
       console.error("Failed to change owner:", error);
@@ -166,11 +190,7 @@ const DashboardHome = () => {
 
   const handleDeleteProject = async (project) => {
     if (!user?.id) return;
-    if (
-      !window.confirm(
-        `Are you sure you want to delete "${project.name}"? This action cannot be undone.`
-      )
-    ) {
+    if (!window.confirm(`Are you sure you want to delete "${project.name}"? This action cannot be undone.`)) {
       return;
     }
     try {
@@ -178,18 +198,11 @@ const DashboardHome = () => {
         `${process.env.REACT_APP_API_URL}/api/projects/${project.id}`,
         { headers: { "X-User-Id": user.id } }
       );
-
       await refreshProjectsForUser();
-
-      // Tell navbar to refresh immediately
       window.dispatchEvent(new Event("projects:refresh"));
     } catch (error) {
       console.error("Failed to delete project:", error);
-      alert(
-        `Failed to delete project: ${
-          error.response?.data?.error || error.message
-        }`
-      );
+      alert(`Failed to delete project: ${error.response?.data?.error || error.message}`);
     }
   };
 
@@ -208,25 +221,16 @@ const DashboardHome = () => {
       setNewProjectName("");
       setShowEditProject(false);
       setEditingProject(null);
-
-      // Tell navbar to refresh immediately
       window.dispatchEvent(new Event("projects:refresh"));
     } catch (error) {
       console.error("Failed to update project:", error);
-      alert(
-        `Failed to update project: ${
-          error.response?.data?.error || error.message
-        }`
-      );
+      alert(`Failed to update project: ${error.response?.data?.error || error.message}`);
     }
   };
 
   if (loading) {
     return (
-      <div
-        className="d-flex align-items-center justify-content-center"
-        style={{ minHeight: "100vh" }}
-      >
+      <div className="d-flex align-items-center justify-content-center" style={{ minHeight: "100vh" }}>
         <div className="text-center">
           <div className="spinner-border text-primary mb-3" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -237,34 +241,31 @@ const DashboardHome = () => {
     );
   }
 
+  const activeCount = projects.filter((p) => (p.status || '').toLowerCase() === 'active').length;
+  const completedCount = projects.filter((p) => (p.status || '').toLowerCase() === 'completed').length;
+
   return (
     <React.Fragment>
-      {/* Main Content (no navbar/footer here) */}
       <div className="flex-grow-1 container mt-4">
         {/* Header */}
         <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
             <h1 className="h3 mb-1">Dashboard</h1>
             <p className="text-muted mb-0">
-              Welcome back, {user?.firstName}! Here's what's happening with your
-              projects.
+              Welcome back, {user?.firstName}! Here's what's happening with your projects.
             </p>
           </div>
           <div className="d-flex align-items-center gap-3">
             {/* View Mode Toggle */}
             <div className="btn-group" role="group">
               <button
-                className={`btn btn-sm ${
-                  viewMode === "grid" ? "btn-primary" : "btn-outline-primary"
-                }`}
+                className={`btn btn-sm ${viewMode === "grid" ? "btn-primary" : "btn-outline-primary"}`}
                 onClick={() => setViewMode("grid")}
               >
                 <i className="bi bi-grid-3x3"></i>
               </button>
               <button
-                className={`btn btn-sm ${
-                  viewMode === "list" ? "btn-primary" : "btn-outline-primary"
-                }`}
+                className={`btn btn-sm ${viewMode === "list" ? "btn-primary" : "btn-outline-primary"}`}
                 onClick={() => setViewMode("list")}
               >
                 <i className="bi bi-list"></i>
@@ -272,76 +273,47 @@ const DashboardHome = () => {
             </div>
 
             {/* Create Project Button */}
-            <button
-              className="btn btn-primary"
-              onClick={() => setShowCreateProject(true)}
-            >
+            <button className="btn btn-primary" onClick={() => setShowCreateProject(true)}>
               <i className="bi bi-plus me-2"></i>
               New Project
             </button>
           </div>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards (Active / Completed) */}
         <div className="row mb-4">
-          <div className="col-md-3">
-            <div className="card border-0 bg-primary text-white">
-              <div className="card-body">
-                <div className="d-flex align-items-center">
-                  <div className="flex-grow-1">
-                    <h6 className="card-title mb-1">Total Projects</h6>
-                    <h3 className="mb-0">{projects.length}</h3>
-                  </div>
-                  <i className="bi bi-folder fs-1 opacity-50"></i>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="card border-0 bg-success text-white">
-              <div className="card-body">
-                <div className="d-flex align-items-center">
-                  <div className="flex-grow-1">
-                    <h6 className="card-title mb-1">Active Projects</h6>
-                    <h3 className="mb-0">
-                      {projects.filter((p) => p.status === "Active").length}
-                    </h3>
-                  </div>
-                  <i className="bi bi-play-circle fs-1 opacity-50"></i>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="card border-0 bg-warning text-white">
-              <div className="card-body">
-                <div className="d-flex align-items-center">
-                  <div className="flex-grow-1">
-                    <h6 className="card-title mb-1">In Progress</h6>
-                    <h3 className="mb-0">
-                      {
-                        projects.filter((p) => p.status === "In Progress")
-                          .length
-                      }
-                    </h3>
-                  </div>
-                  <i className="bi bi-clock fs-1 opacity-50"></i>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-3">
+          <div className="col-md-4">
             <div className="card border-0 bg-info text-white">
-              <div className="card-body">
-                <div className="d-flex align-items-center">
-                  <div className="flex-grow-1">
-                    <h6 className="card-title mb-1">Completed</h6>
-                    <h3 className="mb-0">
-                      {projects.filter((p) => p.status === "Completed").length}
-                    </h3>
-                  </div>
-                  <i className="bi bi-check-circle fs-1 opacity-50"></i>
+              <div className="card-body d-flex align-items-center">
+                <div className="flex-grow-1">
+                  <h6 className="card-title mb-1">Total Projects</h6>
+                  <h3 className="mb-0">{projects.length}</h3>
                 </div>
+                <i className="bi bi-folder fs-1 opacity-50"></i>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-md-4">
+            <div className="card border-0 bg-primary text-white">
+              <div className="card-body d-flex align-items-center">
+                <div className="flex-grow-1">
+                  <h6 className="card-title mb-1">Active</h6>
+                  <h3 className="mb-0">{activeCount}</h3>
+                </div>
+                <i className="bi bi-play-circle fs-1 opacity-50"></i>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-md-4">
+            <div className="card border-0 bg-success text-white">
+              <div className="card-body d-flex align-items-center">
+                <div className="flex-grow-1">
+                  <h6 className="card-title mb-1">Completed</h6>
+                  <h3 className="mb-0">{completedCount}</h3>
+                </div>
+                <i className="bi bi-check-circle fs-1 opacity-50"></i>
               </div>
             </div>
           </div>
@@ -364,13 +336,8 @@ const DashboardHome = () => {
               <div className="text-center py-5">
                 <i className="bi bi-folder-x fs-1 text-muted mb-3"></i>
                 <h5 className="text-muted">No projects yet</h5>
-                <p className="text-muted mb-4">
-                  Create your first project to get started with TeamWorks.
-                </p>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => setShowCreateProject(true)}
-                >
+                <p className="text-muted mb-4">Create your first project to get started with TeamWorks.</p>
+                <button className="btn btn-primary" onClick={() => setShowCreateProject(true)}>
                   <i className="bi bi-plus me-2"></i>
                   Create Your First Project
                 </button>
@@ -395,20 +362,12 @@ const DashboardHome = () => {
 
       {/* Create Project Modal */}
       {showCreateProject && (
-        <div
-          className="modal show d-block"
-          tabIndex="-1"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <div className="modal-dialog">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Create New Project</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowCreateProject(false)}
-                ></button>
+                <button type="button" className="btn-close" onClick={() => setShowCreateProject(false)}></button>
               </div>
               <form onSubmit={handleCreateProject}>
                 <div className="modal-body">
@@ -425,24 +384,14 @@ const DashboardHome = () => {
                   </div>
                   <div className="mb-3">
                     <label className="form-label">Description (Optional)</label>
-                    <textarea
-                      className="form-control"
-                      rows="3"
-                      placeholder="Describe your project..."
-                    ></textarea>
+                    <textarea className="form-control" rows="3" placeholder="Describe your project..."></textarea>
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setShowCreateProject(false)}
-                  >
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowCreateProject(false)}>
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary">
-                    Create Project
-                  </button>
+                  <button type="submit" className="btn btn-primary">Create Project</button>
                 </div>
               </form>
             </div>
@@ -452,11 +401,7 @@ const DashboardHome = () => {
 
       {/* Edit Project Modal */}
       {showEditProject && (
-        <div
-          className="modal show d-block"
-          tabIndex="-1"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <div className="modal-dialog">
             <div className="modal-content">
               <div className="modal-header">
@@ -497,9 +442,7 @@ const DashboardHome = () => {
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary">
-                    Update Project
-                  </button>
+                  <button type="submit" className="btn btn-primary">Update Project</button>
                 </div>
               </form>
             </div>
@@ -509,11 +452,7 @@ const DashboardHome = () => {
 
       {/* Change Owner Modal */}
       {showChangeOwner && (
-        <div
-          className="modal show d-block"
-          tabIndex="-1"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <div className="modal-dialog">
             <div className="modal-content">
               <div className="modal-header">
@@ -532,17 +471,20 @@ const DashboardHome = () => {
               <form onSubmit={handleUpdateOwner}>
                 <div className="modal-body">
                   <div className="mb-3">
-                    <label className="form-label">New Owner Email</label>
-                    <input
-                      type="email"
-                      className="form-control"
+                    <label className="form-label">New Owner (must be a member)</label>
+                    <select
+                      className="form-select"
                       value={ownerEmailInput}
                       onChange={(e) => setOwnerEmailInput(e.target.value)}
-                      placeholder="user@example.com"
                       required
-                    />
+                    >
+                      <option value="" disabled>Select a member</option>
+                      {memberOptionsForOwner.map(m => (
+                        <option key={m.id} value={m.email}>{m.name} ({m.email})</option>
+                      ))}
+                    </select>
                     <div className="form-text">
-                      Enter the email of the user who will become the new owner.
+                      Only existing project members can be selected as the new owner.
                     </div>
                   </div>
                 </div>
@@ -559,9 +501,7 @@ const DashboardHome = () => {
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary">
-                    Change Owner
-                  </button>
+                  <button type="submit" className="btn btn-primary">Change Owner</button>
                 </div>
               </form>
             </div>
