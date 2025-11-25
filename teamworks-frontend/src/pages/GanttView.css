@@ -1,0 +1,132 @@
+.gantt-wrapper {
+  min-height: 68vh;
+}
+
+.gantt-container {
+  width: 100%;
+  height: 68vh;
+}
+
+.gantt-toolbar .btn-check:checked + .btn,
+.gantt-toolbar .btn.active {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+}
+
+.gantt-toolbar .btn {
+  min-width: 80px;
+}
+
+.gantt-today-cell {
+  background-color: rgba(13, 110, 253, 0.12);
+  position: relative;
+}
+
+.gantt-today-cell::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: rgba(13, 110, 253, 0.55);
+}
+
+.gantt-container .gantt_task_line.status-to-do {
+  background-color: rgba(13, 110, 253, 0.15);
+  border: 1px solid rgba(13, 110, 253, 0.3);
+}
+
+.gantt-container .gantt_task_line.status-in-progress {
+  background-color: rgba(255, 193, 7, 0.2);
+  border: 1px solid rgba(255, 193, 7, 0.35);
+}
+
+.gantt-container .gantt_task_line.status-done {
+  background-color: rgba(25, 135, 84, 0.25);
+  border: 1px solid rgba(25, 135, 84, 0.35);
+}
+
+.gantt-container .gantt_link_line {
+  stroke: rgba(33, 37, 41, 0.65);
+  stroke-width: 2px;
+}
+
+.gantt-container .gantt_task_progress_drag {
+  background: rgba(33, 37, 41, 0.35);
+}
+
+.gantt-readonly-hint {
+  border: 1px dashed #adb5bd;
+  background: #f8f9fa;
+}
+
+.dependency-list .list-group-item {
+  font-size: 0.95rem;
+}
+
+.gantt-scale-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+  font-size: 0.85rem;
+  gap: 2px;
+}
+
+.gantt-scale-day .day-number {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.gantt-scale-day .day-weekday {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  color: #6c757d;
+}
+
+.gantt-scale-week {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.15;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.gantt-scale-week .week-range {
+  font-weight: 600;
+}
+
+.gantt-scale-week .week-label {
+  font-size: 0.7rem;
+  color: #6c757d;
+  text-transform: uppercase;
+}
+
+/* Hide section navigation dots/buttons in lightbox completely */
+.gantt_popup_navigation,
+.gantt_popup_nav,
+.gantt_popup_navigation_item,
+.gantt_popup_nav_item,
+.gantt_popup_nav_dot,
+.gantt_popup_navigation_dot,
+div[class*="navigation"],
+div[class*="nav_item"] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide any undefined button text */
+button:empty,
+.gantt_popup_btn:empty {
+  display: none !important;
+}
+
+/* Fix undefined labels in lightbox - show proper labels */
+.gantt_popup_control > label:empty,
+.gantt_popup_label:empty {
+  display: none !important;
+}
+
