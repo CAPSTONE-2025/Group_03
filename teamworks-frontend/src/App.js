@@ -12,6 +12,7 @@ import WelcomePage from './pages/WelcomePage';
 import Login from './pages/Login';
 import KanbanBoardPage from './pages/KanbanBoard';
 import ProfilePage from "./pages/Profile";
+import GanttView from './pages/GanttView';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
@@ -51,6 +52,7 @@ function AppContent() {
             <Route path="/projects/:projectId/calendar" element={<CalendarPage />} />
             <Route path="/projects/:projectId/backlog" element={<BacklogPage />} />
             <Route path="/projects/:projectId/kanbanboard" element={<KanbanBoardPage />} />
+            <Route path="/projects/:projectId/ganttchart" element={<GanttView />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Route>

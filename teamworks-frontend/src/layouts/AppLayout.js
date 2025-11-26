@@ -110,6 +110,7 @@ export default function AppLayout() {
                           <Link className="btn btn-sm btn-outline-primary" to={`/projects/${p.id}/backlog`}>Backlog</Link>
                           <Link className="btn btn-sm btn-outline-success" to={`/projects/${p.id}/kanbanboard`}>Kanban</Link>
                           <Link className="btn btn-sm btn-outline-info" to={`/projects/${p.id}/calendar`}>Calendar</Link>
+                          <Link className="btn btn-sm btn-outline-warning" to={`/projects/${p.id}/ganttchart`}>GanttChart</Link>
                         </div>
                       </div>
                     </li>
