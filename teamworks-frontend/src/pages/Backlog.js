@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import axios from "axios";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 
 import AddTaskForm from "../components/AddTaskForm";
 import TaskForm from "../components/TaskForm";
@@ -9,6 +9,7 @@ import { AuthContext } from "../contexts/AuthContext";
 
 function Backlog() {
   const { projectId } = useParams();
+  const navigate = useNavigate();
   const { user } = useContext(AuthContext);
 
   // ---- member options + lookup for display ----
@@ -33,20 +34,37 @@ function Backlog() {
   const [isEditing, setIsEditing] = useState(false);
   const [projectName, setProjectName] = useState("");
 
-  const [projectStatus, setProjectStatus] = useState("Active"); // <-- NEW
+  const [projectStatus, setProjectStatus] = useState("Active");
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
-
-  const [pendingInvites, setPendingInvites] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ---- invite modal state (replaces window.prompt/alert) ----
+  // ---- invite modal state ----
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteError, setInviteError] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState("");
+
+  // ---- ownership & membership ----
+  const [ownerId, setOwnerId] = useState(null);
+  const [memberIds, setMemberIds] = useState([]);
+
+  // ---- dropdown selected member to remove ----
+  const [selectedMemberToRemove, setSelectedMemberToRemove] = useState("");
+
+  // ---- leave project modal ----
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaveMessage, setLeaveMessage] = useState("");
+
+  const PROJECT_BASE = projectId
+    ? `${process.env.REACT_APP_API_URL}/api/projects/${projectId}`
+    : null;
+
+  const API_URL = PROJECT_BASE
+    ? `${PROJECT_BASE}/backlog`
+    : null;
 
   const openInvite = () => {
     setInviteEmail("");
@@ -54,11 +72,13 @@ function Backlog() {
     setInviteSuccess("");
     setShowInvite(true);
   };
+
   const closeInvite = () => {
     setShowInvite(false);
     setInviteError("");
     setInviteSuccess("");
   };
+
   const submitInvite = async (e) => {
     e?.preventDefault?.();
     const trimmed = (inviteEmail || "").trim().toLowerCase();
@@ -71,23 +91,16 @@ function Backlog() {
     }
 
     try {
-      const { data } = await axios.post(
+      await axios.post(
         `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/invite`,
         { emails: [trimmed] }
       );
-      setPendingInvites(data.pendingInvites || []);
       setInviteSuccess(`Invitation sent to ${trimmed}.`);
-      // Optional: close modal after success
-      // setTimeout(closeInvite, 900);
     } catch (err) {
       const msg = err.response?.data?.error || "Failed to send invite.";
       setInviteError(msg);
     }
   };
-
-  const API_URL = projectId
-    ? `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/backlog`
-    : null;
 
   // -------------------- EFFECTS --------------------
   // Project name + members + current status
@@ -102,20 +115,31 @@ function Backlog() {
         setProjectName(pres.data.name);
         setProjectStatus(pres.data.status || "Active");
 
-        const memberIds = pres.data.members || [];
+        const memberIdsFromRes = pres.data.members || [];
+        setMemberIds(memberIdsFromRes);
+        setOwnerId(pres.data.owner || null);
+
         const ures = await axios.get(`${process.env.REACT_APP_API_URL}/api/users`);
         const allUsers = Array.isArray(ures.data) ? ures.data : [];
-        const onlyMembers = allUsers.filter((u) => memberIds.includes(String(u.id)));
+        const onlyMembers = allUsers.filter((u) =>
+          memberIdsFromRes.includes(String(u.id))
+        );
         setMemberOptions(onlyMembers);
 
         const lookup = {};
         for (const u of onlyMembers) lookup[String(u.id)] = u.name || u.email;
         setMemberLookup(lookup);
-      } catch {
+      } catch (err) {
+        // If removed or no access, redirect away
+        if (err.response?.status === 403 || err.response?.status === 404) {
+          alert("You no longer have access to this project.");
+          navigate("/", { replace: true });
+          return;
+        }
         setProjectName("Unknown Project");
       }
     })();
-  }, [projectId]);
+  }, [projectId, navigate]);
 
   // Tasks
   useEffect(() => {
@@ -126,6 +150,11 @@ function Backlog() {
         const response = await axios.get(API_URL);
         setTasks(response.data);
       } catch (err) {
+        if (err.response?.status === 403 || err.response?.status === 404) {
+          alert("You no longer have access to this project.");
+          navigate("/", { replace: true });
+          return;
+        }
         setError(err);
       } finally {
         setLoading(false);
@@ -133,11 +162,19 @@ function Backlog() {
     };
 
     fetchTasks();
-  }, [projectId, API_URL]);
+  }, [projectId, API_URL, navigate]);
 
   if (!projectId) {
     return <div>No project selected. Please go back to your projects.</div>;
   }
+
+  // membership helpers
+  const isOwner =
+    ownerId && user?.id && String(ownerId) === String(user.id);
+
+  const isMember =
+    user?.id &&
+    memberIds.some((id) => String(id) === String(user.id));
 
   // -------------------- HANDLERS --------------------
   const handleAddTask = async (newTask) => {
@@ -226,6 +263,65 @@ function Backlog() {
     }
   };
 
+  // 🔁 Leave project
+  const handleLeaveProject = async () => {
+    if (!PROJECT_BASE) return;
+
+    try {
+      const res = await axios.delete(`${PROJECT_BASE}/members/self`);
+      const msg = res.data?.message || "You have left the project.";
+      setLeaveMessage(msg);
+
+      // Refresh navbar projects
+      window.dispatchEvent(new Event("projects:refresh"));
+
+      // Short delay then redirect
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 800);
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to leave project.");
+    }
+  };
+
+  // 🔁 Owner removes member (using dropdown)
+  const handleRemoveMember = async () => {
+    if (!PROJECT_BASE) return;
+    if (!selectedMemberToRemove) {
+      alert("Please select a member to remove.");
+      return;
+    }
+
+    // Redundant safety (owner is disabled in UI)
+    if (String(selectedMemberToRemove) === String(ownerId)) {
+      alert("Owner cannot be removed from the project.");
+      return;
+    }
+
+    if (!window.confirm("Remove this member from the project?")) return;
+
+    try {
+      await axios.delete(`${PROJECT_BASE}/members/${selectedMemberToRemove}`);
+
+      // Update memberIds + options + lookup locally
+      setMemberIds((prev) =>
+        prev.filter((id) => String(id) !== String(selectedMemberToRemove))
+      );
+      setMemberOptions((prev) =>
+        prev.filter((m) => String(m.id) !== String(selectedMemberToRemove))
+      );
+      setMemberLookup((prev) => {
+        const copy = { ...prev };
+        delete copy[String(selectedMemberToRemove)];
+        return copy;
+      });
+
+      setSelectedMemberToRemove("");
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to remove member.");
+    }
+  };
+
   // -------------------- LOADING & ERROR --------------------
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error.message}</div>;
@@ -239,42 +335,71 @@ function Backlog() {
         {/* ----------- LEFT SIDE (TASK LIST) ----------- */}
         <div className={showForm || showTaskForm ? "col-lg-7 col-md-12" : "col-12"}>
           <h3 className="text-center mb-4">
-            Backlog Board {projectName ? <span className="text-muted">– {projectName}</span> : null}
+            Backlog Board{" "}
+            {projectName ? <span className="text-muted">– {projectName}</span> : null}
           </h3>
 
-          {/* Controls: status selector (right) + Invite button */}
-          <div className="d-flex align-items-center justify-content-between mb-2">
-            <div>
-              {pendingInvites.length > 0 ? (
-                <small className="text-muted">
-                  Pending invites: {pendingInvites.map((p) => p.email).join(", ")}
-                </small>
-              ) : (
-                <small className="text-muted">No pending invites</small>
-              )}
-            </div>
+          {/* Top-right: Member dropdown (owner), Invite, Leave */}
+          <div className="d-flex align-items-center justify-content-end mb-2 gap-2">
+            {/* Owner: member dropdown + remove button (same side as Invite) */}
+            {isOwner && memberOptions.length > 0 && (
+              <div className="d-flex flex-column align-items-end me-2">
+                <div className="d-flex align-items-center gap-2">
+                  <select
+                    className="form-select form-select-sm"
+                    style={{ maxWidth: 260 }}
+                    value={selectedMemberToRemove}
+                    onChange={(e) => setSelectedMemberToRemove(e.target.value)}
+                  >
+                    <option value="">Project Members</option>
+                    {memberOptions.map((m) => (
+                      <option
+                        key={m.id}
+                        value={m.id}
+                        disabled={String(m.id) === String(ownerId)}
+                      >
+                        {m.name || m.email}
+                        {String(m.id) === String(ownerId) ? " (Owner)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={handleRemoveMember}
+                    disabled={
+                      !selectedMemberToRemove ||
+                      String(selectedMemberToRemove) === String(ownerId)
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )}
 
-            <div className="d-flex align-items-center gap-2">
-              <select
-                className="form-select form-select-sm"
-                value={projectStatus}
-                onChange={handleProjectStatusChange}
-                style={{ width: 160 }}
-                title="Project Status"
+            <button className="btn btn-outline-secondary" onClick={openInvite}>
+              Invite Members
+            </button>
+
+            {/* Leave Project button: only for members who are not owner */}
+            {isMember && !isOwner && (
+              <button
+                className="btn btn-outline-danger"
+                onClick={() => {
+                  setLeaveMessage("");
+                  setShowLeaveModal(true);
+                }}
               >
-                <option value="Active">Active</option>
-                <option value="Completed">Completed</option>
-              </select>
-
-              <button className="btn btn-outline-secondary ms-2" onClick={openInvite}>
-                Invite Members
+                Leave Project
               </button>
-            </div>
+            )}
           </div>
 
           {isCompleted && (
             <div className="alert alert-info py-2 mb-3">
-              This project is marked as <strong>Completed</strong>. Task creation is disabled.
+              This project is marked as <strong>Completed</strong>. Task creation is
+              disabled.
             </div>
           )}
 
@@ -318,34 +443,51 @@ function Backlog() {
             </tbody>
           </table>
 
-          <div className="d-flex justify-content-end">
-            <button
-              className="btn btn-primary me-2"
-              disabled={isCompleted}
-              onClick={() => {
-                setShowForm(true);
-                setShowTaskForm(false);
-                setSelectedTask(null);
-              }}
-              title={isCompleted ? "Project is completed. Adding is disabled." : ""}
-            >
-              Add
-            </button>
+          {/* Bottom row: Add/Delete on left, Status dropdown on right */}
+          <div className="d-flex justify-content-between align-items-center">
+            <div>
+              <button
+                className="btn btn-primary me-2"
+                disabled={isCompleted}
+                onClick={() => {
+                  setShowForm(true);
+                  setShowTaskForm(false);
+                  setSelectedTask(null);
+                }}
+                title={isCompleted ? "Project is completed. Adding is disabled." : ""}
+              >
+                Add
+              </button>
 
-            <button
-              className="btn btn-danger"
-              disabled={isCompleted || !selectedTaskId}
-              onClick={handleDeleteTask}
-              title={
-                isCompleted
-                  ? "Project is completed. Deleting is disabled."
-                  : !selectedTaskId
-                  ? "Select a task to delete."
-                  : ""
-              }
-            >
-              Delete
-            </button>
+              <button
+                className="btn btn-danger"
+                disabled={isCompleted || !selectedTaskId}
+                onClick={handleDeleteTask}
+                title={
+                  isCompleted
+                    ? "Project is completed. Deleting is disabled."
+                    : !selectedTaskId
+                    ? "Select a task to delete."
+                    : ""
+                }
+              >
+                Delete
+              </button>
+            </div>
+
+            <div>
+              <label className="me-2 small text-muted">Project Status</label>
+              <select
+                className="form-select form-select-sm d-inline-block"
+                style={{ width: 160 }}
+                value={projectStatus}
+                onChange={handleProjectStatusChange}
+                title="Project Status"
+              >
+                <option value="Active">Active</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -471,7 +613,11 @@ function Backlog() {
                   </div>
 
                   <div className="modal-footer">
-                    <button type="button" className="btn btn-secondary" onClick={closeInvite}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={closeInvite}
+                    >
                       Cancel
                     </button>
                     <button type="submit" className="btn btn-primary">
@@ -479,6 +625,70 @@ function Backlog() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ----------- LEAVE PROJECT MODAL ----------- */}
+      {showLeaveModal && (
+        <>
+          <div className="modal-backdrop fade show"></div>
+
+          <div
+            className="modal fade show"
+            tabIndex="-1"
+            role="dialog"
+            aria-modal="true"
+            style={{ display: "block" }}
+          >
+            <div className="modal-dialog">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Leave Project</h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    aria-label="Close"
+                    onClick={() => setShowLeaveModal(false)}
+                  />
+                </div>
+
+                <div className="modal-body">
+                  {!leaveMessage && (
+                    <p>
+                      Are you sure you want to leave this project? You will lose
+                      access to its backlog, Kanban, calendar, and Gantt pages.
+                    </p>
+                  )}
+                  {leaveMessage && (
+                    <div className="alert alert-success py-2 mb-0">
+                      {leaveMessage}
+                    </div>
+                  )}
+                </div>
+
+                <div className="modal-footer">
+                  {!leaveMessage && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setShowLeaveModal(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={handleLeaveProject}
+                      >
+                        Leave Project
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>

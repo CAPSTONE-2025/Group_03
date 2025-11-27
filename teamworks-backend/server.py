@@ -16,6 +16,64 @@ def home():
     return jsonify({"message": "Welcome to Teamworks!"})
 
 
+# -------------------- Owner/auth helpers--------------------
+
+def get_request_user_id():
+    uid = request.headers.get("X-User-Id")
+    try:
+        return ObjectId(uid) if uid else None
+    except Exception:
+        return None
+    
+    
+def get_request_user():
+    uid = get_request_user_id()
+    if not uid:
+        return None
+    return get_users_collection().find_one({"_id": uid})
+
+
+def require_project_owner(fn):
+    @wraps(fn)
+    def wrapper(project_id, *args, **kwargs):
+        user_id = get_request_user_id()
+        if not user_id:
+            return jsonify({"error": "Missing X-User-Id header"}), 401
+        proj = get_projects_collection().find_one(
+            {"_id": ObjectId(project_id)}, { "owner": 1}
+        )
+        if not proj:
+            return jsonify({"error": "Project not found"}), 404
+        if str(proj.get("owner")) != str(user_id):
+            return jsonify({"error": "Only the project owner can invite"}), 403
+        request._request_user_id = user_id
+        return fn(project_id, *args, **kwargs)
+
+    return wrapper
+
+
+def require_project_member(fn):
+    @wraps(fn)
+    def wrapper(project_id, *args, **kwargs):
+        user_id = get_request_user_id()
+        if not user_id:
+            return jsonify({"error": "Missing X-User-Id header"}), 401
+
+        proj = get_projects_collection().find_one(
+            {"_id": ObjectId(project_id), "members": user_id},
+            {"_id": 1}
+        )
+        if not proj:
+            return jsonify({"error": "You are not a member of this project"}), 403
+
+        # stash for later if needed
+        request._request_user_id = user_id
+        return fn(project_id, *args, **kwargs)
+
+    return wrapper
+
+# --------------------  ---------------------
+
 # -------------------- PROJECT ROUTES --------------------
 @app.route('/api/projects', methods=['POST'])
 def create_project():
@@ -53,6 +111,7 @@ def list_user_projects(user_id):
     return jsonify(projects)
 
 @app.route('/api/project/<project_id>', methods=['GET'])
+@require_project_member
 def get_project(project_id):
     p = get_projects_collection().find_one({"_id": ObjectId(project_id)})
     if not p:
@@ -68,42 +127,7 @@ def get_project(project_id):
     })
 
 
-# -------------------- Owner/auth helpers--------------------
 
-def get_request_user_id():
-    uid = request.headers.get("X-User-Id")
-    try:
-        return ObjectId(uid) if uid else None
-    except Exception:
-        return None
-    
-    
-def get_request_user():
-    uid = get_request_user_id()
-    if not uid:
-        return None
-    return get_users_collection().find_one({"_id": uid})
-
-
-def require_project_owner(fn):
-    @wraps(fn)
-    def wrapper(project_id, *args, **kwargs):
-        user_id = get_request_user_id()
-        if not user_id:
-            return jsonify({"error": "Missing X-User-Id header"}), 401
-        proj = get_projects_collection().find_one(
-            {"_id": ObjectId(project_id)}, { "owner": 1}
-        )
-        if not proj:
-            return jsonify({"error": "Project not found"}), 404
-        if str(proj.get("owner")) != str(user_id):
-            return jsonify({"error": "Only the project owner can invite"}), 403
-        request._request_user_id = user_id
-        return fn(project_id, *args, **kwargs)
-
-    return wrapper
-
-# --------------------  ---------------------
 
 @app.route("/api/projects/<project_id>/status", methods=["PATCH"])
 @require_project_owner
@@ -460,6 +484,7 @@ def _as_iso_date(value):
 
 
 @app.route('/api/projects/<project_id>/backlog', methods=['GET'])
+@require_project_member
 def get_project_backlog(project_id):
     tasks = []
     for task in backlog_collection.find({"projectId": ObjectId(project_id)}):
@@ -500,6 +525,7 @@ def get_project_backlog(project_id):
 
 
 @app.route('/api/projects/<project_id>/backlog', methods=['POST'])
+@require_project_member
 def create_project_backlog(project_id):
     data = request.json
     required_fields = ["title", "description", "label", "status", "priority", "assignedTo", "startDate", "dueDate"]
@@ -529,6 +555,7 @@ def create_project_backlog(project_id):
 
 
 @app.route("/api/projects/<project_id>/backlog/<task_id>", methods=["PUT"])
+@require_project_member
 def update_task(project_id, task_id):
     data = request.json
     task = backlog_collection.find_one(
@@ -557,6 +584,7 @@ def update_task(project_id, task_id):
 
 
 @app.route("/api/projects/<project_id>/backlog/<task_id>", methods=["DELETE"])
+@require_project_member
 def delete_task(project_id, task_id):
     result = backlog_collection.delete_one(
         {"_id": ObjectId(task_id), "projectId": ObjectId(project_id)}
@@ -564,6 +592,93 @@ def delete_task(project_id, task_id):
     if result.deleted_count == 0:
         return jsonify({"error": "Task not found"}), 404
     return jsonify({"message": "Task deleted successfully"})
+
+
+#------------------- leaves own project ---------------------
+@app.route("/api/projects/<project_id>/members/self", methods=["DELETE"])
+def leave_project(project_id):
+    """
+    Current user (from X-User-Id) leaves the project.
+    Owner cannot use this; must transfer ownership or delete project.
+    """
+    user_id = get_request_user_id()
+    if not user_id:
+        return jsonify({"error": "Missing X-User-Id header"}), 401
+
+    projects = get_projects_collection()
+    proj = projects.find_one(
+        {"_id": ObjectId(project_id)},
+        {"owner": 1, "members": 1, "name": 1}
+    )
+    if not proj:
+        return jsonify({"error": "Project not found"}), 404
+
+    # Owner cannot leave via this endpoint
+    if str(proj.get("owner")) == str(user_id):
+        return jsonify({
+            "error": "Project owners cannot leave their own project. "
+                     "Transfer ownership or delete the project instead."
+        }), 400
+
+    if user_id not in proj.get("members", []):
+        return jsonify({"error": "You are not a member of this project."}), 400
+
+    res = projects.update_one(
+        {"_id": ObjectId(project_id)},
+        {
+            "$pull": {"members": user_id},
+            "$set": {"updatedAt": datetime.utcnow()}
+        }
+    )
+
+    if res.modified_count == 0:
+        return jsonify({"error": "Failed to leave project"}), 500
+
+    return jsonify({"message": f'You have left "{proj.get("name", "this project")}".'}), 200
+
+# --------------------------owner removes another member-------------------------------------
+
+@app.route("/api/projects/<project_id>/members/<member_id>", methods=["DELETE"])
+@require_project_owner
+def remove_member(project_id, member_id):
+    """
+    Project owner removes another member.
+    Owners cannot remove themselves here; they should use transfer/delete.
+    """
+    projects = get_projects_collection()
+    proj = projects.find_one(
+        {"_id": ObjectId(project_id)},
+        {"owner": 1, "members": 1, "name": 1}
+    )
+    if not proj:
+        return jsonify({"error": "Project not found"}), 404
+
+    # Do not allow owner to "kick" themselves
+    if str(proj.get("owner")) == str(member_id):
+        return jsonify({"error": "Owner cannot be removed from the project."}), 400
+
+    try:
+        member_obj_id = ObjectId(member_id)
+    except Exception:
+        return jsonify({"error": "Invalid member id"}), 400
+
+    if member_obj_id not in proj.get("members", []):
+        return jsonify({"error": "User is not a member of this project."}), 404
+
+    res = projects.update_one(
+        {"_id": ObjectId(project_id)},
+        {
+            "$pull": {"members": member_obj_id},
+            "$set": {"updatedAt": datetime.utcnow()}
+        }
+    )
+
+    if res.modified_count == 0:
+        return jsonify({"error": "Failed to remove member"}), 500
+
+    return jsonify({"message": "Member removed from project."}), 200
+
+# --------------------------------------------------------
 
 
 # ORIGINAL GREEN BLOCK (Do not remove or modify)
@@ -753,6 +868,7 @@ def login_user():
 
 #     return jsonify(comment), 201
 @app.route('/api/projects/<project_id>/backlog/<task_id>/comments', methods=['GET'])
+@require_project_member
 def get_comments(project_id, task_id):
     comments = []
     for comment in get_comments_collection().find({"taskId": ObjectId(task_id)}).sort("timestamp", 1):
@@ -766,6 +882,7 @@ def get_comments(project_id, task_id):
     return jsonify(comments)
 
 @app.route('/api/projects/<project_id>/backlog/<task_id>/comments', methods=['POST'])
+@require_project_member
 def add_comment(project_id, task_id):
     data = request.json
     text = data.get("text")
