@@ -80,11 +80,7 @@ const ProjectCard = ({ project, onSelectProject, onEditProject, onDeleteProject,
                     <i className="bi bi-person-gear me-2"></i>Change Project Owner
                   </button>
                 </li>
-                <li>
-                  <button className="dropdown-item" onClick={(e) => e.stopPropagation()}>
-                    <i className="bi bi-people me-2"></i>Manage Members
-                  </button>
-                </li>
+
                 <li><hr className="dropdown-divider" /></li>
                 <li>
                   <button
@@ -159,13 +155,13 @@ const ProjectCard = ({ project, onSelectProject, onEditProject, onDeleteProject,
         </div>
 
         {/* Footer: Due date only */}
-        <div className="card-footer bg-transparent border-top-0 pt-0">
+        {/* <div className="card-footer bg-transparent border-top-0 pt-0">
           <div className="d-flex justify-content-end align-items-center">
             <small className="text-muted">
               Due: {project.dueDate ? new Date(project.dueDate).toLocaleDateString() : 'No due date'}
             </small>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );
