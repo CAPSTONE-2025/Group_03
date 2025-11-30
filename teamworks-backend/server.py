@@ -573,6 +573,7 @@ def update_task(project_id, task_id):
         "assignedTo",
         "startDate",
         "dueDate",
+        "progress"
     ]
     update = {field: data[field] for field in allowed_fields if field in data}
 
