@@ -103,6 +103,82 @@ def require_project_owner(fn):
 
     return wrapper
 
+
+def _load_project_with_members(project_id):
+    """
+    Returns (project_document or None, error_response or None)
+    """
+    try:
+        project = get_projects_collection().find_one(
+            {"_id": ObjectId(project_id)},
+            {"members": 1, "owner": 1, "roles": 1}
+        )
+    except Exception:
+        return None, (jsonify({"error": "Invalid project ID"}), 400)
+    if not project:
+        return None, (jsonify({"error": "Project not found"}), 404)
+    return project, None
+
+
+def _user_is_member(project, user_id):
+    if not project or not user_id:
+        return False
+    if str(project.get("owner")) == str(user_id):
+        return True
+    return any(str(member) == str(user_id) for member in project.get("members", []))
+
+
+def _user_can_edit_project(project, user_id):
+    if not project or not user_id:
+        return False
+    if str(project.get("owner")) == str(user_id):
+        return True
+    roles = project.get("roles") or []
+    # If roles structure exists, honor explicit permissions
+    if roles:
+        for role in roles:
+            if str(role.get("userId")) == str(user_id) and role.get("canEditGantt"):
+                return True
+        return False
+    # Fallback: allow members to edit when no roles schema is defined
+    return any(str(member) == str(user_id) for member in project.get("members", []))
+
+
+def require_project_member(fn):
+    @wraps(fn)
+    def wrapper(project_id, *args, **kwargs):
+        user_id = get_request_user_id()
+        if not user_id:
+            return jsonify({"error": "Missing X-User-Id header"}), 401
+        project, error = _load_project_with_members(project_id)
+        if error:
+            return error
+        if not _user_is_member(project, user_id):
+            return jsonify({"error": "You do not have access to this project."}), 403
+        request._request_user_id = user_id
+        request._project_doc = project
+        return fn(project_id, *args, **kwargs)
+
+    return wrapper
+
+
+def require_project_editor(fn):
+    @wraps(fn)
+    def wrapper(project_id, *args, **kwargs):
+        user_id = get_request_user_id()
+        if not user_id:
+            return jsonify({"error": "Missing X-User-Id header"}), 401
+        project, error = _load_project_with_members(project_id)
+        if error:
+            return error
+        if not _user_can_edit_project(project, user_id):
+            return jsonify({"error": "You do not have permission to modify this project."}), 403
+        request._request_user_id = user_id
+        request._project_doc = project
+        return fn(project_id, *args, **kwargs)
+
+    return wrapper
+
 # --------------------  ---------------------
 
 @app.route("/api/projects/<project_id>/status", methods=["PATCH"])
@@ -459,7 +535,62 @@ def _as_iso_date(value):
     return str(value)
 
 
+def _parse_iso_date(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError:
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+            except Exception:
+                return None
+    return None
+
+
+def _normalize_progress(value):
+    if value is None:
+        return 0
+    try:
+        progress = float(value)
+    except (TypeError, ValueError):
+        raise ValueError("progress must be a number")
+    if progress < 0 or progress > 100:
+        raise ValueError("progress must be between 0 and 100")
+    return round(progress, 2)
+
+
+def _normalize_dependencies(dep_ids, project_id, exclude_task_id=None):
+    if dep_ids is None:
+        return []
+    if not isinstance(dep_ids, list):
+        raise ValueError("dependencies must be an array of task ids")
+    normalized = []
+    project_oid = ObjectId(project_id)
+    exclude_oid = ObjectId(exclude_task_id) if exclude_task_id else None
+    for dep in dep_ids:
+        try:
+            dep_oid = ObjectId(dep)
+        except Exception:
+            raise ValueError("Each dependency id must be a valid task id")
+        if exclude_oid and dep_oid == exclude_oid:
+            raise ValueError("A task cannot depend on itself")
+        task_exists = backlog_collection.find_one(
+            {"_id": dep_oid, "projectId": project_oid},
+            {"_id": 1}
+        )
+        if not task_exists:
+            raise ValueError("Dependency task not found in this project")
+        if dep_oid not in normalized:
+            normalized.append(dep_oid)
+    return normalized
+
+
 @app.route('/api/projects/<project_id>/backlog', methods=['GET'])
+@require_project_member
 def get_project_backlog(project_id):
     tasks = []
     for task in backlog_collection.find({"projectId": ObjectId(project_id)}):
@@ -473,6 +604,8 @@ def get_project_backlog(project_id):
             "assignedTo": task["assignedTo"],
             "startDate": task["startDate"],
             "dueDate": task["dueDate"],
+            "progress": task.get("progress", 0),
+            "dependencies": [str(dep) for dep in task.get("dependencies", [])],
             "projectId": str(task["projectId"]),
         })
     return jsonify(tasks)
@@ -500,6 +633,7 @@ def get_project_backlog(project_id):
 
 
 @app.route('/api/projects/<project_id>/backlog', methods=['POST'])
+@require_project_editor
 def create_project_backlog(project_id):
     data = request.json
     required_fields = ["title", "description", "label", "status", "priority", "assignedTo", "startDate", "dueDate"]
@@ -513,15 +647,36 @@ def create_project_backlog(project_id):
     except Exception:
         return jsonify({"error": "assignedTo must be a valid user id"}), 400
 
+    start_date_obj = _parse_iso_date(data["startDate"])
+    due_date_obj = _parse_iso_date(data["dueDate"])
+    if not start_date_obj or not due_date_obj:
+        return jsonify({"error": "startDate and dueDate must be valid ISO dates"}), 400
+    if due_date_obj < start_date_obj:
+        return jsonify({"error": "dueDate cannot be before startDate"}), 400
+
+    try:
+        progress_value = _normalize_progress(data.get("progress"))
+        dependencies_list = _normalize_dependencies(data.get("dependencies"), project_id)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    project_doc = getattr(request, "_project_doc", None)
+    if project_doc and not any(str(member) == str(assigned_id) for member in project_doc.get("members", [])):
+        return jsonify({"error": "assignedTo must be a member of this project"}), 400
+
     task = {
         "title": data["title"],
         "description": data["description"],
         "label": data["label"],
         "status": data["status"],
         "priority": data["priority"],
-        "assignedTo": data["assignedTo"],
-        "startDate": data["startDate"],
-        "dueDate": data["dueDate"],
+        "assignedTo": str(assigned_id),
+        "startDate": start_date_obj.isoformat(),
+        "dueDate": due_date_obj.isoformat(),
+        "progress": progress_value,
+        "dependencies": dependencies_list,
+        "createdAt": datetime.utcnow(),
+        "updatedAt": datetime.utcnow(),
         "projectId": ObjectId(project_id),
     }
     result = backlog_collection.insert_one(task)
@@ -529,6 +684,7 @@ def create_project_backlog(project_id):
 
 
 @app.route("/api/projects/<project_id>/backlog/<task_id>", methods=["PUT"])
+@require_project_editor
 def update_task(project_id, task_id):
     data = request.json
     task = backlog_collection.find_one(
@@ -537,33 +693,161 @@ def update_task(project_id, task_id):
     if not task:
         return jsonify({"error": "Task not found"}), 404
 
-    allowed_fields = [
-        "title",
-        "description",
-        "label",
-        "status",
-        "priority",
-        "assignedTo",
-        "startDate",
-        "dueDate",
-    ]
-    update = {field: data[field] for field in allowed_fields if field in data}
+    update = {}
+
+    if "title" in data:
+        update["title"] = data["title"]
+    if "description" in data:
+        update["description"] = data["description"]
+    if "label" in data:
+        update["label"] = data["label"]
+    if "status" in data:
+        update["status"] = data["status"]
+    if "priority" in data:
+        update["priority"] = data["priority"]
+    if "assignedTo" in data:
+        try:
+            assigned_id = ObjectId(data["assignedTo"])
+        except Exception:
+            return jsonify({"error": "assignedTo must be a valid user id"}), 400
+        project_doc = getattr(request, "_project_doc", None)
+        if project_doc and not any(str(member) == str(assigned_id) for member in project_doc.get("members", [])):
+            return jsonify({"error": "assignedTo must be a member of this project"}), 400
+        update["assignedTo"] = str(assigned_id)
+
+    current_start = _parse_iso_date(task.get("startDate"))
+    current_due = _parse_iso_date(task.get("dueDate"))
+
+    new_start = current_start
+    new_due = current_due
+
+    if "startDate" in data:
+        start_date_obj = _parse_iso_date(data["startDate"])
+        if not start_date_obj:
+            return jsonify({"error": "startDate must be a valid ISO date"}), 400
+        new_start = start_date_obj
+    if "dueDate" in data:
+        due_date_obj = _parse_iso_date(data["dueDate"])
+        if not due_date_obj:
+            return jsonify({"error": "dueDate must be a valid ISO date"}), 400
+        new_due = due_date_obj
+
+    if new_start and new_due and new_due < new_start:
+        return jsonify({"error": "dueDate cannot be before startDate"}), 400
+
+    if "startDate" in data and new_start:
+        update["startDate"] = new_start.isoformat()
+    if "dueDate" in data and new_due:
+        update["dueDate"] = new_due.isoformat()
+
+    if "progress" in data:
+        try:
+            update["progress"] = _normalize_progress(data.get("progress"))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    if "dependencies" in data:
+        try:
+            update["dependencies"] = _normalize_dependencies(
+                data.get("dependencies"),
+                project_id,
+                exclude_task_id=task_id
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
     if not update:
         return jsonify({"error": "No valid fields to update"}), 400
 
+    update["updatedAt"] = datetime.utcnow()
     backlog_collection.update_one({"_id": ObjectId(task_id)}, {"$set": update})
     return jsonify({"message": "Task updated successfully"})
 
 
 @app.route("/api/projects/<project_id>/backlog/<task_id>", methods=["DELETE"])
+@require_project_editor
 def delete_task(project_id, task_id):
     result = backlog_collection.delete_one(
         {"_id": ObjectId(task_id), "projectId": ObjectId(project_id)}
     )
     if result.deleted_count == 0:
         return jsonify({"error": "Task not found"}), 404
+    # Remove the deleted task from other dependency lists
+    try:
+        backlog_collection.update_many(
+            {"projectId": ObjectId(project_id)},
+            {
+                "$pull": {"dependencies": ObjectId(task_id)},
+                "$set": {"updatedAt": datetime.utcnow()}
+            }
+        )
+    except Exception:
+        pass
     return jsonify({"message": "Task deleted successfully"})
+
+
+@app.route("/api/projects/<project_id>/backlog/<task_id>/dependencies", methods=["POST"])
+@require_project_editor
+def add_task_dependency(project_id, task_id):
+    data = request.json or {}
+    dependency_id = data.get("dependencyId")
+    if not dependency_id:
+        return jsonify({"error": "dependencyId is required"}), 400
+
+    task = backlog_collection.find_one(
+        {"_id": ObjectId(task_id), "projectId": ObjectId(project_id)}
+    )
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+
+    try:
+        dependencies = _normalize_dependencies(
+            [dependency_id],
+            project_id,
+            exclude_task_id=task_id
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    dep_oid = dependencies[0]
+    backlog_collection.update_one(
+        {"_id": ObjectId(task_id)},
+        {
+            "$addToSet": {"dependencies": dep_oid},
+            "$set": {"updatedAt": datetime.utcnow()}
+        }
+    )
+
+    updated = backlog_collection.find_one({"_id": ObjectId(task_id)})
+    deps = [str(dep) for dep in updated.get("dependencies", [])]
+    return jsonify({"message": "Dependency added", "dependencies": deps}), 200
+
+
+@app.route("/api/projects/<project_id>/backlog/<task_id>/dependencies/<dependency_id>", methods=["DELETE"])
+@require_project_editor
+def remove_task_dependency(project_id, task_id, dependency_id):
+    try:
+        dep_oid = ObjectId(dependency_id)
+    except Exception:
+        return jsonify({"error": "Invalid dependency id"}), 400
+
+    task = backlog_collection.find_one(
+        {"_id": ObjectId(task_id), "projectId": ObjectId(project_id)}
+    )
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+
+    backlog_collection.update_one(
+        {"_id": ObjectId(task_id)},
+        {
+            "$pull": {"dependencies": dep_oid},
+            "$set": {"updatedAt": datetime.utcnow()}
+        }
+    )
+
+    updated = backlog_collection.find_one({"_id": ObjectId(task_id)})
+    deps = [str(dep) for dep in updated.get("dependencies", [])]
+    return jsonify({"message": "Dependency removed", "dependencies": deps}), 200
 
 
 # ORIGINAL GREEN BLOCK (Do not remove or modify)
