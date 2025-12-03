@@ -57,7 +57,7 @@ export default function AppLayout() {
 
   return (
     <div className="d-flex flex-column min-vh-100">
-      <nav className="navbar navbar-expand-lg navbar-light bg-light">
+      <nav className="navbar navbar-expand-md navbar-light bg-light">
         <div className="container">
           <Link className="navbar-brand" to="/">TeamWorks</Link>
 
@@ -110,7 +110,6 @@ export default function AppLayout() {
                           <Link className="btn btn-sm btn-outline-primary" to={`/projects/${p.id}/backlog`}>Backlog</Link>
                           <Link className="btn btn-sm btn-outline-success" to={`/projects/${p.id}/kanbanboard`}>Kanban</Link>
                           <Link className="btn btn-sm btn-outline-info" to={`/projects/${p.id}/calendar`}>Calendar</Link>
-                          <Link className="btn btn-sm btn-outline-warning" to={`/projects/${p.id}/gantt`}>Gantt</Link>
                         </div>
                       </div>
                     </li>
@@ -136,10 +135,10 @@ export default function AppLayout() {
 
               {/* 🔔 */}
               <NotificationBell />
-              <Link className="nav-link me-3" to="/profile">
+              <Link className="nav-link me-3" title="Profile" to="/profile">
                 <i className="bi bi-person fs-5" />
               </Link>
-              <button className="btn btn-link nav-link p-0" onClick={handleLogout}>
+              <button className="btn btn-link nav-link p-0" title="Logout" onClick={handleLogout}>
                 <i className="bi bi-box-arrow-right fs-5" />
               </button>
             </div>

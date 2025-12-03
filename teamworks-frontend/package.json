@@ -10,7 +10,6 @@
     "axios": "^1.8.1",
     "bootstrap": "^5.3.3",
     "bootstrap-icons": "^1.13.1",
-    "dhtmlx-gantt": "^8.0.11",
     "nth-check": "^2.1.1",
     "postcss": "^8.5.3",
     "react": "^19.0.0",
