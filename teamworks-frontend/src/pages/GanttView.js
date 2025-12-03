@@ -12,6 +12,7 @@ import { AuthContext } from "../contexts/AuthContext";
 import { gantt } from "dhtmlx-gantt";
 import "dhtmlx-gantt/codebase/dhtmlxgantt.css";
 import "./GanttView.css";
+import AddTaskForm from "../components/AddTaskForm";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const NORMALIZED_API_ROOT = (() => {
@@ -92,6 +93,19 @@ function GanttView() {
   const [viewMode, setViewMode] = useState("week");
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [dependencyDraft, setDependencyDraft] = useState("");
+  const [showAddTaskForm, setShowAddTaskForm] = useState(false);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (showAddTaskForm) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showAddTaskForm]);
 
   const TASKS_ENDPOINT = buildApiPath(`/api/projects/${projectId}/backlog`);
 
@@ -1400,6 +1414,54 @@ function GanttView() {
     loadData();
   };
 
+  const handleAddTask = async (newTask) => {
+    try {
+      console.log("Creating task with data:", newTask);
+      console.log("Available members:", memberOptions);
+      
+      // Validate required fields
+      if (!newTask.title || !newTask.status || !newTask.priority || !newTask.assignedTo || !newTask.startDate || !newTask.dueDate) {
+        setBanner({
+          type: "error",
+          message: "Please fill in all required fields (Title, Status, Priority, Assigned To, Start Date, Due Date).",
+        });
+        return;
+      }
+
+      // Ensure assignedTo is valid
+      if (!memberOptions.find(m => String(m.id) === String(newTask.assignedTo))) {
+        setBanner({
+          type: "error",
+          message: "Please select a valid team member.",
+        });
+        return;
+      }
+
+      const response = await axios.post(TASKS_ENDPOINT, newTask);
+      console.log("Task created successfully:", response.data);
+      
+      setShowAddTaskForm(false);
+      // Refresh tasks - the useEffect will automatically update the Gantt chart
+      await refreshTasksQuietly();
+      setBanner({
+        type: "success",
+        message: "Task created successfully!",
+      });
+    } catch (err) {
+      console.error("Error creating task:", err);
+      const errorMsg = err.response?.data?.error || err.message || "Failed to create task.";
+      setBanner({
+        type: "error",
+        message: errorMsg,
+      });
+      // Don't close modal on error so user can fix and retry
+    }
+  };
+
+  const handleCancelAddTask = () => {
+    setShowAddTaskForm(false);
+  };
+
   const handleProgressSlider = async (event) => {
     const value = Number(event.target.value);
     if (!selectedTask || Number.isNaN(value) || isReadOnly) return;
@@ -1742,6 +1804,14 @@ function GanttView() {
               </div>
               <div className="btn-group btn-group-sm">
                 <button
+                  className="btn btn-outline-success"
+                  onClick={() => setShowAddTaskForm(true)}
+                  title="Create new task"
+                >
+                  <i className="bi bi-plus-circle me-1" />
+                  Create Task
+                </button>
+                <button
                   className="btn btn-outline-secondary"
                   onClick={handleFitTimeline}
                   disabled={!scheduledTasksCount}
@@ -1909,6 +1979,59 @@ function GanttView() {
           </div>
         </div>
       </div>
+
+      {/* Add Task Modal */}
+      {showAddTaskForm && (
+        <>
+          <div
+            className="modal fade show"
+            style={{ display: "block", zIndex: 1050 }}
+            tabIndex="-1"
+            role="dialog"
+            aria-labelledby="addTaskModalLabel"
+            aria-modal="true"
+            onClick={(e) => {
+              // Close modal only if clicking the backdrop (the modal container itself)
+              if (e.target === e.currentTarget) {
+                handleCancelAddTask();
+              }
+            }}
+          >
+            <div 
+              className="modal-dialog modal-lg modal-dialog-scrollable" 
+              role="document"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title" id="addTaskModalLabel">
+                    <i className="bi bi-plus-circle me-2"></i>
+                    Create New Task
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    aria-label="Close"
+                    onClick={handleCancelAddTask}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  <AddTaskForm
+                    onAdd={handleAddTask}
+                    onCancel={handleCancelAddTask}
+                    members={memberOptions}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div 
+            className="modal-backdrop fade show" 
+            onClick={handleCancelAddTask}
+            style={{ backgroundColor: "rgba(0, 0, 0, 0.5)", zIndex: 1040 }}
+          ></div>
+        </>
+      )}
     </div>
   );
 }

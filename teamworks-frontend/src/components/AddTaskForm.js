@@ -22,20 +22,34 @@ function AddTaskForm({ onAdd, onCancel, members = [] }) {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onAdd(newTask); // ✅ let backend generate ID
-    setNewTask({
-      title: "",
-      description: "",
-      label: "",
-      status: "",
-      priority: "",
-      assignedTo: "",
-      startDate: "",
-      dueDate: "",
-      progress: 0,
-    });
+    e.stopPropagation();
+    
+    // Validate required fields before submitting
+    if (!newTask.title || !newTask.status || !newTask.priority || !newTask.assignedTo || !newTask.startDate || !newTask.dueDate) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+    
+    try {
+      await onAdd(newTask); // Wait for the async operation
+      // Only reset form if task was created successfully
+      setNewTask({
+        title: "",
+        description: "",
+        label: "",
+        status: "",
+        priority: "",
+        assignedTo: "",
+        startDate: "",
+        dueDate: "",
+        progress: 0,
+      });
+    } catch (error) {
+      // Error is handled by parent component, don't reset form
+      console.error("Error in form submission:", error);
+    }
   };
 
   return (
