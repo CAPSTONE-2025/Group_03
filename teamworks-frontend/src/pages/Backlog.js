@@ -124,7 +124,16 @@ function Backlog() {
     const fetchTasks = async () => {
       try {
         const response = await axios.get(API_URL);
-        setTasks(response.data);
+        const payload = Array.isArray(response.data) ? response.data : [];
+        setTasks(
+          payload.map((task) => ({
+            ...task,
+            progress: Number(task.progress ?? 0),
+            dependencies: Array.isArray(task.dependencies)
+              ? task.dependencies
+              : [],
+          }))
+        );
       } catch (err) {
         setError(err);
       } finally {
@@ -143,7 +152,15 @@ function Backlog() {
   const handleAddTask = async (newTask) => {
     try {
       const response = await axios.post(API_URL, newTask);
-      setTasks([...tasks, { ...newTask, id: response.data.id }]);
+      setTasks([
+        ...tasks,
+        {
+          ...newTask,
+          id: response.data.id,
+          progress: Number(newTask.progress ?? 0),
+          dependencies: [],
+        },
+      ]);
       setShowForm(false);
     } catch (err) {
       setError(err);
@@ -289,6 +306,7 @@ function Backlog() {
                 <th>Assigned To</th>
                 <th>Start Date</th>
                 <th>Due Date</th>
+                <th>Progress</th>
               </tr>
             </thead>
             <tbody>
@@ -313,6 +331,7 @@ function Backlog() {
                   <td>{memberLookup[String(task.assignedTo)] || task.assignedTo}</td>
                   <td>{task.startDate}</td>
                   <td>{task.dueDate}</td>
+                  <td>{Math.round(task.progress ?? 0)}%</td>
                 </tr>
               ))}
             </tbody>

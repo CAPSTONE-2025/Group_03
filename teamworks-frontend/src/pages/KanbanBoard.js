@@ -42,7 +42,16 @@ function KanbanBoard() {
         setMemberLookup(lookup);
 
         const tres = await axios.get(BACKLOG_URL);
-        setTasks(tres.data);
+        const payload = Array.isArray(tres.data) ? tres.data : [];
+        setTasks(
+          payload.map((task) => ({
+            ...task,
+            progress: Number(task.progress ?? 0),
+            dependencies: Array.isArray(task.dependencies)
+              ? task.dependencies
+              : [],
+          }))
+        );
       } catch (err) {
         setError(err);
       } finally {

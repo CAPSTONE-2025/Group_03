@@ -154,6 +154,14 @@ const ProjectCard = ({ project, onSelectProject, onEditProject, onDeleteProject,
               >
                 <i className="bi bi-kanban"></i>
               </Link>
+              <Link
+                to={`/projects/${project.id}/gantt`}
+                className="btn btn-sm btn-outline-warning"
+                onClick={(e) => e.stopPropagation()}
+                title="View Gantt"
+              >
+                <i className="bi bi-calendar-range"></i>
+              </Link>
             </div>
           </div>
         </div>

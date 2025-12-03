@@ -11,10 +11,15 @@ function AddTaskForm({ onAdd, onCancel, members = [] }) {
     assignedTo: "",
     startDate: "",
     dueDate: "",
+    progress: 0,
   });
 
   const handleInputChange = (e) => {
-    setNewTask({ ...newTask, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setNewTask({
+      ...newTask,
+      [name]: name === "progress" ? Number(value) : value,
+    });
   };
 
   const handleSubmit = (e) => {
@@ -29,6 +34,7 @@ function AddTaskForm({ onAdd, onCancel, members = [] }) {
       assignedTo: "",
       startDate: "",
       dueDate: "",
+      progress: 0,
     });
   };
 
@@ -172,6 +178,24 @@ function AddTaskForm({ onAdd, onCancel, members = [] }) {
             onChange={handleInputChange}
             required
           />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="progress">Progress (%)</label>
+          <input
+            type="number"
+            className="form-control"
+            id="progress"
+            name="progress"
+            min="0"
+            max="100"
+            step="5"
+            value={newTask.progress}
+            onChange={handleInputChange}
+          />
+          <small className="text-muted">
+            Set an initial completion percentage between 0 and 100.
+          </small>
         </div>
 
         <div className="d-flex justify-content-end mt-2">

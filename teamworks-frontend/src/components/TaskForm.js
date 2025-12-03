@@ -27,6 +27,10 @@ function TaskForm({ task, onEdit, onClose, memberLookup = {} }) {
             <p>{task.startDate}</p>
             <p className="mb-1"><strong>Due Date:</strong></p> 
             <p>{task.dueDate}</p>
+            <p className="mb-1"><strong>Progress:</strong></p>
+            <p>{Math.round(task.progress ?? 0)}%</p>
+            <p className="mb-1"><strong>Dependencies:</strong></p>
+            <p>{Array.isArray(task.dependencies) ? task.dependencies.length : 0}</p>
 
             <div className="d-flex justify-content-end mt-3">
                 <button className="btn btn-primary me-2" onClick={onEdit}>Edit</button>

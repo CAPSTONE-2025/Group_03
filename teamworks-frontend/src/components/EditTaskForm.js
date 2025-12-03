@@ -3,15 +3,25 @@ import ReactMarkdown from 'react-markdown';
 
 function EditTaskForm({ task, onEdit, onCancel, members = [] }) {
   // Initialize local state with the task data
-  const [editedTask, setEditedTask] = useState(task);
+  const [editedTask, setEditedTask] = useState({
+    ...task,
+    progress: Number(task.progress ?? 0),
+  });
 
   // When the task prop changes, update the local state accordingly
   useEffect(() => {
-    setEditedTask(task);
+    setEditedTask({
+      ...task,
+      progress: Number(task.progress ?? 0),
+    });
   }, [task]);
 
   const handleInputChange = (e) => {
-    setEditedTask({ ...editedTask, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setEditedTask({
+      ...editedTask,
+      [name]: name === "progress" ? Number(value) : value,
+    });
   };
 
   const handleSubmit = (e) => {
@@ -150,6 +160,20 @@ function EditTaskForm({ task, onEdit, onCancel, members = [] }) {
             value={editedTask.dueDate} 
             onChange={handleInputChange} 
             required
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="progress">Progress (%)</label>
+          <input
+            type="number"
+            className="form-control"
+            id="progress"
+            name="progress"
+            min="0"
+            max="100"
+            step="5"
+            value={editedTask.progress ?? 0}
+            onChange={handleInputChange}
           />
         </div>
         <div className="d-flex justify-content-end mt-2">
