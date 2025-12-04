@@ -6,6 +6,7 @@ import bcrypt
 from bson import ObjectId
 from datetime import datetime
 from functools import wraps
+from flask_jwt_extended import jwt_required
 
 app = Flask(__name__)
 CORS(app)
@@ -24,8 +25,8 @@ def get_request_user_id():
         return ObjectId(uid) if uid else None
     except Exception:
         return None
-    
-    
+
+
 def get_request_user():
     uid = get_request_user_id()
     if not uid:
@@ -135,8 +136,8 @@ def get_request_user_id():
         return ObjectId(uid) if uid else None
     except Exception:
         return None
-    
-    
+
+
 def get_request_user():
     uid = get_request_user_id()
     if not uid:
@@ -296,7 +297,7 @@ def respond_invitation():
     return jsonify({"message": f"Invitation {status_text}."}), 200
 
 
-#---------------------Owner notifications list & mark read---------------------
+# ---------------------Owner notifications list & mark read---------------------
 
 @app.route("/api/notifications", methods=["GET"])
 def list_notifications():
