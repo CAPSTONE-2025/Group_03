@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { apiFetch } from "../utils/apiClient";
+
 
 function HomePage({ projs, user, refreshProjects }) {
   const projects = projs || [];
@@ -11,8 +13,16 @@ function HomePage({ projs, user, refreshProjects }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/users`);
-        setUsers(res.data);
+        // const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/users`);
+        const res = await apiFetch(`/api/users`, { method: "GET" });
+
+        if (!res.ok) {
+          console.error("Failed to fetch users, status:", res.status);
+          return;
+        }
+        const resData = await res.json();
+        console.log(resData);
+        setUsers(resData); 
       } catch (err) {
         console.error("Failed to fetch users", err);
       }
@@ -31,15 +41,21 @@ function HomePage({ projs, user, refreshProjects }) {
       return alert("Selected user must be a member of this project");
     }
 
-    const selectedUser = users.find((u) => String(u.id) === String(selectedUserId));
+    const selectedUser = users.find(
+      (u) => String(u.id) === String(selectedUserId)
+    );
     if (!selectedUser) return alert("Selected user not found");
 
     try {
-      await axios.put(
-        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/owner`,
-        { ownerEmail: selectedUser.email },
-        { headers: { "X-User-Id": user.id } }
-      );
+      // await axios.put(
+      //   `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/owner`,
+      //   { ownerEmail: selectedUser.email },
+      //   { headers: { "X-User-Id": user.id } }
+      // );
+      await apiFetch(`/api/projects/${projectId}/owner`, {
+        method: "PUT",
+        ownerEmail: selectedUser.email,
+      });
       alert("Project ownership updated!");
       await refreshProjects(); // 🔁 update navbar + list
     } catch (err) {
@@ -57,10 +73,13 @@ function HomePage({ projs, user, refreshProjects }) {
 
   const handleDelete = async (projectId) => {
     try {
-      await axios.delete(
-        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}`,
-        { headers: { "X-User-Id": user.id } }
-      );
+      // await axios.delete(
+      //   `${process.env.REACT_APP_API_URL}/api/projects/${projectId}`,
+      //   { headers: { "X-User-Id": user.id } }
+      // );
+     await apiFetch(`/api/projects/${projectId}`, {
+       method: "DELETE",
+     });
       alert("Project deleted");
       await refreshProjects();
     } catch (err) {
@@ -81,11 +100,15 @@ function HomePage({ projs, user, refreshProjects }) {
     if (!newName.trim()) return alert("Enter a new name first");
 
     try {
-      await axios.put(
-        `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/name`,
-        { projectName: newName },
-        { headers: { "X-User-Id": user.id } }
-      );
+      // await axios.put(
+      //   `${process.env.REACT_APP_API_URL}/api/projects/${projectId}/name`,
+      //   { projectName: newName },
+      //   { headers: { "X-User-Id": user.id } }
+      // );
+      await apiFetch(`/api/projects/${projectId}/name`, {
+        method: "PUT",
+        projectName: newName,
+      });
       alert("Project name changed");
       await refreshProjects();
       setNameEdits((prev) => ({ ...prev, [projectId]: "" }));
