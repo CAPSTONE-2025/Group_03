@@ -127,6 +127,91 @@ def get_project(project_id):
     })
 
 
+# -------------------- LEAVE PROJECT (member) --------------------
+@app.route("/api/projects/<project_id>/members/self", methods=["DELETE"])
+@require_project_member
+def leave_project(project_id):
+    """
+    Current logged-in user leaves the project.
+    Owner is not allowed to leave this way.
+    Auth: X-User-Id header required (handled by require_project_member).
+    """
+    user_id = get_request_user_id()
+    if not user_id:
+        return jsonify({"error": "Missing X-User-Id header"}), 401
+
+    projects = get_projects_collection()
+    proj = projects.find_one(
+        {"_id": ObjectId(project_id)},
+        {"owner": 1, "members": 1}
+    )
+    if not proj:
+        return jsonify({"error": "Project not found"}), 404
+
+    # Prevent owner from leaving without transferring / deleting
+    if str(proj.get("owner")) == str(user_id):
+        return jsonify({
+            "error": "Project owner cannot leave the project. "
+                     "Transfer ownership or delete the project instead."
+        }), 400
+
+    result = projects.update_one(
+        {"_id": ObjectId(project_id)},
+        {
+            "$pull": {"members": user_id},
+            "$set": {"updatedAt": datetime.utcnow()}
+        }
+    )
+
+    if result.modified_count == 0:
+        return jsonify({"error": "You are not a member of this project"}), 400
+
+    return jsonify({"message": "You have left the project."}), 200
+
+# -------------------- REMOVE PROJECT MEMBER (by owner) --------------------
+@app.route("/api/projects/<project_id>/members/<member_id>", methods=["DELETE"])
+@require_project_owner
+def remove_member(project_id, member_id):
+    """
+    Owner removes a member from the project.
+    Cannot remove the current owner.
+    Auth: X-User-Id must be the owner (handled by require_project_owner).
+    """
+    projects = get_projects_collection()
+
+    try:
+        member_oid = ObjectId(member_id)
+    except Exception:
+        return jsonify({"error": "Invalid member id"}), 400
+
+    proj = projects.find_one(
+        {"_id": ObjectId(project_id)},
+        {"owner": 1, "members": 1}
+    )
+    if not proj:
+        return jsonify({"error": "Project not found"}), 404
+
+    # Back-end safety: do not allow removing owner
+    if str(proj.get("owner")) == str(member_oid):
+        return jsonify({"error": "Cannot remove the project owner."}), 400
+
+    # Ensure the user is actually in members
+    if not any(str(m) == str(member_oid) for m in proj.get("members", [])):
+        return jsonify({"error": "User is not a member of this project."}), 400
+
+    result = projects.update_one(
+        {"_id": ObjectId(project_id)},
+        {
+            "$pull": {"members": member_oid},
+            "$set": {"updatedAt": datetime.utcnow()}
+        }
+    )
+
+    if result.modified_count == 0:
+        return jsonify({"error": "Member not removed"}), 400
+
+    return jsonify({"message": "Member removed from project."}), 200
+
 # -------------------- Owner/auth helpers--------------------
 
 def get_request_user_id():
