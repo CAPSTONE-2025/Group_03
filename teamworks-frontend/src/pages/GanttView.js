@@ -94,6 +94,7 @@ function GanttView() {
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [dependencyDraft, setDependencyDraft] = useState("");
   const [showAddTaskForm, setShowAddTaskForm] = useState(false);
+  const [progressSliderValue, setProgressSliderValue] = useState(null);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -591,6 +592,8 @@ function GanttView() {
 
   useEffect(() => {
     setDependencyDraft("");
+    // Reset progress slider value when task selection changes
+    setProgressSliderValue(null);
   }, [selectedTaskId]);
 
   const ganttDataset = useMemo(() => {
@@ -1462,26 +1465,94 @@ function GanttView() {
     setShowAddTaskForm(false);
   };
 
-  const handleProgressSlider = async (event) => {
+  const handleProgressSliderChange = (event) => {
     const value = Number(event.target.value);
     if (!selectedTask || Number.isNaN(value) || isReadOnly) return;
+    
+    // Update local state for immediate UI feedback
+    setProgressSliderValue(value);
+    
+    // Optimistically update the UI immediately
+    const updatedTasks = tasks.map((task) =>
+      String(task.id) === String(selectedTask.id)
+        ? { ...task, progress: value }
+        : task
+    );
+    setTasks(updatedTasks);
+    
+    // Update Gantt chart immediately for visual feedback
+    if (hasInitializedRef.current) {
+      const ganttTask = gantt.getTask(String(selectedTask.id));
+      if (ganttTask) {
+        ganttTask.progress = value / 100; // Gantt uses 0-1 range
+        gantt.updateTask(String(selectedTask.id));
+        gantt.render();
+      }
+    }
+  };
+
+  const handleProgressSliderCommit = async (event) => {
+    const value = Number(event.target.value);
+    if (!selectedTask || Number.isNaN(value) || isReadOnly) return;
+    
     try {
       await axios.put(`${TASKS_ENDPOINT}/${selectedTask.id}`, {
         progress: value,
       });
+      
+      // Update tasks with the confirmed value from backend
+      const updatedTasks = tasks.map((task) =>
+        String(task.id) === String(selectedTask.id)
+          ? { ...task, progress: value }
+          : task
+      );
+      setTasks(updatedTasks);
+      setProgressSliderValue(null); // Clear local state, use task value
+      
+      // Ensure Gantt chart reflects the saved value
+      if (hasInitializedRef.current) {
+        const ganttTask = gantt.getTask(String(selectedTask.id));
+        if (ganttTask) {
+          ganttTask.progress = value / 100;
+          gantt.updateTask(String(selectedTask.id));
+          gantt.render();
+        }
+      }
+      
+      setBanner({
+        type: "success",
+        message: "Progress updated successfully!",
+      });
+      
+      // Small delay before refresh to ensure backend has processed
+      setTimeout(async () => {
+        await refreshTasksQuietly();
+      }, 500);
+    } catch (err) {
+      console.error("Error updating progress:", err);
+      // Revert on error
+      const originalProgress = selectedTask.progress ?? 0;
       setTasks((prev) =>
         prev.map((task) =>
           String(task.id) === String(selectedTask.id)
-            ? { ...task, progress: value }
+            ? { ...task, progress: originalProgress }
             : task
         )
       );
-    } catch (err) {
+      // Revert Gantt chart
+      if (hasInitializedRef.current) {
+        const ganttTask = gantt.getTask(String(selectedTask.id));
+        if (ganttTask) {
+          ganttTask.progress = originalProgress / 100;
+          gantt.updateTask(String(selectedTask.id));
+          gantt.render();
+        }
+      }
+      setProgressSliderValue(originalProgress);
       setBanner({
         type: "error",
         message: getErrorMessage(err, "Failed to update progress."),
       });
-      await refreshTasksQuietly();
     }
   };
 
@@ -1887,19 +1958,45 @@ function GanttView() {
                   </dl>
 
                   <div className="mb-3">
-                    <label className="form-label small text-muted">
-                      Adjust Progress
-                    </label>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <label className="form-label small text-muted mb-0">
+                        <i className="bi bi-graph-up me-1"></i>
+                        Adjust Progress
+                      </label>
+                      <span className="badge bg-success fs-6">
+                        {Math.round(selectedTask.progress ?? 0)}%
+                      </span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
                     <input
                       type="range"
-                      className="form-range"
+                      className="form-range flex-grow-1"
                       min="0"
                       max="100"
                       step="5"
-                      value={Math.round(selectedTask.progress ?? 0)}
-                      onChange={handleProgressSlider}
+                      value={progressSliderValue !== null ? progressSliderValue : Math.round(selectedTask.progress ?? 0)}
+                      onChange={handleProgressSliderChange}
+                      onMouseUp={handleProgressSliderCommit}
+                      onTouchEnd={handleProgressSliderCommit}
                       disabled={isReadOnly}
                     />
+                      <div className="progress" style={{ width: '60px', height: '8px' }}>
+                        <div
+                          className="progress-bar bg-success"
+                          role="progressbar"
+                          style={{ width: `${Math.round(selectedTask.progress ?? 0)}%` }}
+                          aria-valuenow={Math.round(selectedTask.progress ?? 0)}
+                          aria-valuemin="0"
+                          aria-valuemax="100"
+                        ></div>
+                      </div>
+                    </div>
+                    {isReadOnly && (
+                      <small className="text-muted">
+                        <i className="bi bi-lock me-1"></i>
+                        Read-only mode
+                      </small>
+                    )}
                   </div>
 
                   <div className="mb-3 flex-grow-1">
