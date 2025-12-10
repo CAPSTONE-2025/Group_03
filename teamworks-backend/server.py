@@ -683,8 +683,21 @@ def update_task(project_id, task_id):
         "assignedTo",
         "startDate",
         "dueDate",
+        "progress",
     ]
-    update = {field: data[field] for field in allowed_fields if field in data}
+    update = {}
+    
+    # Handle regular fields
+    for field in allowed_fields:
+        if field in data:
+            update[field] = data[field]
+    
+    # Normalize progress if provided
+    if "progress" in update:
+        try:
+            update["progress"] = _normalize_progress(update["progress"])
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
     if not update:
         return jsonify({"error": "No valid fields to update"}), 400
