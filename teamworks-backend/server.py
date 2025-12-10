@@ -3,9 +3,11 @@ from flask_cors import CORS
 from model import get_users_collection, get_comments_collection, get_projects_collection, get_notifications_collection
 from model import backlog_collection
 import bcrypt
+import os
 from bson import ObjectId
 from datetime import datetime
 from functools import wraps
+from dotenv import load_dotenv
 from flask_jwt_extended import (
     verify_jwt_in_request,
     get_jwt_identity,
@@ -14,11 +16,15 @@ from flask_jwt_extended import (
     JWTManager,
 )
 
+load_dotenv()
+
 app = Flask(__name__)
 CORS(app)
 CORS(app, origins=["http://localhost:3000"])  # CORS for frontend
 
-app.config["JWT_SECRET_KEY"] = "40c930d5ebad8394fa2f1f4a6e95cc31a7a4e68569f86c91"
+# app.config["JWT_SECRET_KEY"] = ""
+app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY")
+
 jwt = JWTManager(app)
 
 @app.route('/')
