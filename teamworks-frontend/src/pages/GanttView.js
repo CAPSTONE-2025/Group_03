@@ -1572,6 +1572,12 @@ function GanttView() {
         )
       );
       setDependencyDraft("");
+      // Refresh Gantt chart to show new dependency link
+      await refreshTasksQuietly();
+      setBanner({
+        type: "success",
+        message: "Dependency added successfully!",
+      });
     } catch (err) {
       setBanner({
         type: "error",
@@ -1594,6 +1600,12 @@ function GanttView() {
             : task
         )
       );
+      // Refresh Gantt chart to remove dependency link
+      await refreshTasksQuietly();
+      setBanner({
+        type: "success",
+        message: "Dependency removed successfully!",
+      });
     } catch (err) {
       setBanner({
         type: "error",
