@@ -170,7 +170,7 @@ export default function AppLayout() {
                               >
                                 {p.name}
                               </div>
-                              <div className="mt-1 d-flex gap-2 flex-wrap">
+                              <div className="mt-1 d-flex gap-2 flex-nowrap">
                                 <Link
                                   className="btn btn-sm btn-outline-primary"
                                   to={`/projects/${p.id}/backlog`}
