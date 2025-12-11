@@ -4,18 +4,11 @@ from flask_mail import Mail, Message
 from model import get_users_collection, get_comments_collection, get_projects_collection, get_notifications_collection
 from model import backlog_collection
 import bcrypt
-import os
 from bson import ObjectId
 from datetime import datetime
 from functools import wraps
+import os
 from dotenv import load_dotenv
-from flask_jwt_extended import (
-    verify_jwt_in_request,
-    get_jwt_identity,
-    jwt_required,
-    create_access_token,
-    JWTManager,
-)
 
 load_dotenv()
 
@@ -23,10 +16,6 @@ app = Flask(__name__)
 CORS(app)
 CORS(app, origins=["http://localhost:3000"])  # CORS for frontend
 
-# app.config["JWT_SECRET_KEY"] = ""
-app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY")
-
-jwt = JWTManager(app)
 # Email configuration
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
@@ -52,8 +41,8 @@ def get_request_user_id():
         return ObjectId(uid) if uid else None
     except Exception:
         return None
-
-
+    
+    
 def get_request_user():
     uid = get_request_user_id()
     if not uid:
@@ -103,7 +92,6 @@ def require_project_member(fn):
 # --------------------  ---------------------
 
 # -------------------- PROJECT ROUTES --------------------
-@jwt_required
 @app.route('/api/projects', methods=['POST'])
 def create_project():
     data = request.json
@@ -249,8 +237,8 @@ def get_request_user_id():
         return ObjectId(uid) if uid else None
     except Exception:
         return None
-
-
+    
+    
 def get_request_user():
     uid = get_request_user_id()
     if not uid:
@@ -410,7 +398,7 @@ def respond_invitation():
     return jsonify({"message": f"Invitation {status_text}."}), 200
 
 
-# ---------------------Owner notifications list & mark read---------------------
+#---------------------Owner notifications list & mark read---------------------
 
 @app.route("/api/notifications", methods=["GET"])
 def list_notifications():
@@ -1094,10 +1082,8 @@ def remove_dependency(project_id, task_id, dependency_id):
 #         return jsonify({"error": "Task not found"}), 404
 #     return jsonify({"message": "Task deleted successfully"})
 
-
 # -------------------- GET USERS ROUTE -------------------- For getting user emails to change ownership
-@app.route("/api/users", methods=["GET"])
-@jwt_required()
+@app.route('/api/users', methods=['GET'])
 def get_users_list():    
     try:
         users_collection = get_users_collection()
@@ -1161,13 +1147,6 @@ def login_user():
     try:
         user = get_users_collection().find_one({"email": data['email']})
         if user and bcrypt.checkpw(data['password'].encode('utf-8'), user['password']):
-            # Create JWT
-            # create_access_token(): function from Flask-JWT-Extended; generates a signed token.
-            # identity=str(user["_id"]): this is the payload that identifies the user. 
-            # Stores the user’s ID in the token. When someone uses this token, 
-            # the server can decode it and know which user is making the request
-            access_token = create_access_token(identity=str(user["_id"]))
-
             # Only return safe fields
             response_user = {
                 "id": str(user['_id']),
@@ -1176,7 +1155,7 @@ def login_user():
                 "email": user.get('email', ''),
                 "bio": user.get('bio', '')  # safe, default empty string
             }
-            return jsonify({"message": "Login successful", "user": response_user, "access_token": access_token}), 200
+            return jsonify({"message": "Login successful", "user": response_user}), 200
         else:
             return jsonify({"error": "Invalid email or password"}), 401
     except Exception as e:

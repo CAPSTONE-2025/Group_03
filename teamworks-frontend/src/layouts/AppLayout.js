@@ -3,7 +3,6 @@ import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import NotificationBell from "../components/NotificationBell";
 import axios from "axios";
-import { apiFetch } from "../utils/apiClient";
 
 export default function AppLayout() {
   const { user } = useAuth();
@@ -23,17 +22,17 @@ export default function AppLayout() {
     }
     try {
       setLoadingProjects(true);
-      const res = await apiFetch(`/api/projects/${user.id}`, { method: "GET" });
-      const data = await res.json();
-
-      setProjects(data || []);
+      const res = await axios.get(
+        `${process.env.REACT_APP_API_URL}/api/projects/${user.id}`
+      );
+      setProjects(res.data || []);
     } catch (e) {
-      console.error("AppLayout.js: Failed to fetch projects:", e);
+      console.error("Navbar projects fetch failed:", e);
       setProjects([]);
     } finally {
       setLoadingProjects(false);
     }
-  }, [user]);
+  }, [user?.id]);
 
   // initial + on user change
   useEffect(() => {
@@ -67,11 +66,16 @@ export default function AppLayout() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDropdownOpen]);
 
+  // If you had rogue contenteditable causing blinking caret:
+  // useEffect(() => {
+  //   document.querySelectorAll("[contenteditable],[contentEditable='true']").forEach(el => {
+  //     el.removeAttribute("contenteditable");
+  //     el.removeAttribute("contentEditable");
+  //   });
+  // }, [location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user_id");
     navigate("/welcome", { replace: true });
   };
 
