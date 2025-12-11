@@ -1,15 +1,32 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_mail import Mail, Message
 from model import get_users_collection, get_comments_collection, get_projects_collection, get_notifications_collection
 from model import backlog_collection
 import bcrypt
 from bson import ObjectId
 from datetime import datetime
 from functools import wraps
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 CORS(app, origins=["http://localhost:3000"])  # CORS for frontend
+
+# Email configuration
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True').lower() == 'true'
+app.config['MAIL_USE_SSL'] = os.getenv('MAIL_USE_SSL', 'False').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', '')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
+app.config['FRONTEND_URL'] = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
+mail = Mail(app)
 
 @app.route('/')
 def home():
@@ -433,21 +450,95 @@ def invite_members(project_id):
         return jsonify({"error": "No valid emails provided"}), 400
 
     projects = get_projects_collection()
-    proj = projects.find_one({"_id": ObjectId(project_id)}, {"pendingInvites": 1})
+    users = get_users_collection()
+    
+    # Get project details for email
+    proj = projects.find_one({"_id": ObjectId(project_id)}, {"name": 1, "description": 1, "pendingInvites": 1, "owner": 1})
     if not proj:
         return jsonify({"error": "Project not found"}), 404
+
+    # Get inviter details
+    inviter = get_request_user()
+    inviter_name = f"{inviter.get('firstName', '')} {inviter.get('lastName', '')}".strip() or inviter.get('email', 'Someone')
 
     # prevent duplicates
     already = { (pi.get("email") or "").lower() for pi in proj.get("pendingInvites", []) }
     new_pending = []
+    emails_sent = []
+    emails_not_found = []
+    
     for email in normalized:
         if email not in already:
+            # Check if email exists in users database
+            user = users.find_one({"email": email})
+            
+            if user:
+                # User exists - send email invitation
+                try:
+                    project_name = proj.get("name", "a project")
+                    frontend_url = app.config['FRONTEND_URL']
+                    
+                    # Create email message
+                    msg = Message(
+                        subject=f"Invitation to join {project_name} on Teamworks",
+                        recipients=[email],
+                        html=f"""
+                        <html>
+                        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                                <h2 style="color: #4a90e2;">Project Invitation</h2>
+                                <p>Hello,</p>
+                                <p><strong>{inviter_name}</strong> has invited you to join the project <strong>"{project_name}"</strong> on Teamworks.</p>
+                                
+                                {f'<p style="color: #666;">{proj.get("description", "")}</p>' if proj.get("description") else ''}
+                                
+                                <p>To accept this invitation, please log in to your Teamworks account and check your invitations.</p>
+                                
+                                <div style="margin: 30px 0;">
+                                    <a href="{frontend_url}" 
+                                       style="background-color: #4a90e2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                                        Go to Teamworks
+                                    </a>
+                                </div>
+                                
+                                <p style="color: #666; font-size: 12px; margin-top: 30px;">
+                                    If you did not expect this invitation, you can safely ignore this email.
+                                </p>
+                            </div>
+                        </body>
+                        </html>
+                        """,
+                        body=f"""
+Hello,
+
+{inviter_name} has invited you to join the project "{project_name}" on Teamworks.
+
+{f'Description: {proj.get("description", "")}' if proj.get("description") else ''}
+
+To accept this invitation, please log in to your Teamworks account at {frontend_url} and check your invitations.
+
+If you did not expect this invitation, you can safely ignore this email.
+                        """
+                    )
+                    mail.send(msg)
+                    emails_sent.append(email)
+                except Exception as e:
+                    print(f"Error sending email to {email}: {str(e)}")
+                    # Still add to pending invites even if email fails
+                    pass
+            
+            # Add to pending invites regardless (for both existing users and non-existing)
+            # But only send email if user exists
             new_pending.append({
                 "email": email,
                 "status": "pending",
                 "invitedBy": request._request_user_id,
-                "invitedAt": datetime.utcnow()
+                "invitedAt": datetime.utcnow(),
+                "emailSent": user is not None  # Track if email was sent
             })
+            
+            if not user:
+                emails_not_found.append(email)
 
     if new_pending:
         projects.update_one(
@@ -464,10 +555,23 @@ def invite_members(project_id):
             "status": pi.get("status", "pending"),
             "invitedBy": str(pi.get("invitedBy")) if pi.get("invitedBy") else None,
             "invitedAt": pi.get("invitedAt").isoformat() if isinstance(pi.get("invitedAt"), datetime) else str(pi.get("invitedAt", "")),
+            "emailSent": pi.get("emailSent", False)
         }
         for pi in proj2.get("pendingInvites", [])
     ]
-    return jsonify({"pendingInvites": pending_serialized}), 200
+    
+    response_data = {
+        "pendingInvites": pending_serialized,
+        "emailsSent": len(emails_sent),
+        "emailsNotFound": emails_not_found
+    }
+    
+    if emails_not_found:
+        response_data["message"] = f"Invitations added. {len(emails_sent)} email(s) sent to existing users. {len(emails_not_found)} email(s) not sent (no account found)."
+    else:
+        response_data["message"] = f"Invitations sent successfully! {len(emails_sent)} email(s) sent."
+    
+    return jsonify(response_data), 200
 
 
 # -------------------- CHANGE PROJECT NAME ------------------
@@ -768,8 +872,21 @@ def update_task(project_id, task_id):
         "assignedTo",
         "startDate",
         "dueDate",
+        "progress",
     ]
-    update = {field: data[field] for field in allowed_fields if field in data}
+    update = {}
+    
+    # Handle regular fields
+    for field in allowed_fields:
+        if field in data:
+            update[field] = data[field]
+    
+    # Normalize progress if provided
+    if "progress" in update:
+        try:
+            update["progress"] = _normalize_progress(update["progress"])
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
     if not update:
         return jsonify({"error": "No valid fields to update"}), 400
@@ -798,6 +915,105 @@ def delete_task(project_id, task_id):
     except Exception:
         pass
     return jsonify({"message": "Task deleted successfully"})
+
+
+@app.route("/api/projects/<project_id>/backlog/<task_id>/dependencies", methods=["POST"])
+@require_project_member
+def add_dependency(project_id, task_id):
+    data = request.json or {}
+    dependency_id = data.get("dependencyId")
+    
+    if not dependency_id:
+        return jsonify({"error": "dependencyId is required"}), 400
+    
+    # Verify task exists
+    task = backlog_collection.find_one(
+        {"_id": ObjectId(task_id), "projectId": ObjectId(project_id)}
+    )
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    
+    # Verify dependency task exists in same project
+    dep_task = backlog_collection.find_one(
+        {"_id": ObjectId(dependency_id), "projectId": ObjectId(project_id)}
+    )
+    if not dep_task:
+        return jsonify({"error": "Dependency task not found in this project"}), 404
+    
+    # Prevent self-dependency
+    if str(task_id) == str(dependency_id):
+        return jsonify({"error": "A task cannot depend on itself"}), 400
+    
+    # Get current dependencies
+    current_deps = task.get("dependencies", [])
+    dep_oid = ObjectId(dependency_id)
+    
+    # Check if already a dependency
+    if dep_oid in current_deps:
+        return jsonify({"error": "Dependency already exists"}), 400
+    
+    # Add dependency
+    new_deps = current_deps + [dep_oid]
+    try:
+        normalized_deps = _normalize_dependencies(
+            [str(d) for d in new_deps],
+            project_id,
+            exclude_task_id=task_id
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    
+    backlog_collection.update_one(
+        {"_id": ObjectId(task_id)},
+        {
+            "$set": {
+                "dependencies": normalized_deps,
+                "updatedAt": datetime.utcnow()
+            }
+        }
+    )
+    
+    # Return updated task with dependencies as strings
+    updated_task = backlog_collection.find_one({"_id": ObjectId(task_id)})
+    return jsonify({
+        "message": "Dependency added successfully",
+        "dependencies": [str(dep) for dep in updated_task.get("dependencies", [])]
+    }), 200
+
+
+@app.route("/api/projects/<project_id>/backlog/<task_id>/dependencies/<dependency_id>", methods=["DELETE"])
+@require_project_member
+def remove_dependency(project_id, task_id, dependency_id):
+    # Verify task exists
+    task = backlog_collection.find_one(
+        {"_id": ObjectId(task_id), "projectId": ObjectId(project_id)}
+    )
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    
+    # Get current dependencies
+    current_deps = task.get("dependencies", [])
+    dep_oid = ObjectId(dependency_id)
+    
+    # Remove dependency
+    new_deps = [d for d in current_deps if d != dep_oid]
+    
+    backlog_collection.update_one(
+        {"_id": ObjectId(task_id)},
+        {
+            "$set": {
+                "dependencies": new_deps,
+                "updatedAt": datetime.utcnow()
+            }
+        }
+    )
+    
+    # Return updated task with dependencies as strings
+    updated_task = backlog_collection.find_one({"_id": ObjectId(task_id)})
+    return jsonify({
+        "message": "Dependency removed successfully",
+        "dependencies": [str(dep) for dep in updated_task.get("dependencies", [])]
+    }), 200
 
 
 # ORIGINAL GREEN BLOCK (Do not remove or modify)
