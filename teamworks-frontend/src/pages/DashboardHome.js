@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import ProjectCard from "../components/ProjectCard";
-import axios from "axios";
+// import axios from "axios";
 import "../Dashboard.css";
+import { apiFetch } from "../utils/apiClient";
+
 
 const DashboardHome = () => {
   const { user } = useAuth();
@@ -34,17 +36,19 @@ const DashboardHome = () => {
       }
       try {
         const [projRes, usersRes] = await Promise.all([
-          axios.get(`${process.env.REACT_APP_API_URL}/api/projects/${user.id}`),
-          axios.get(`${process.env.REACT_APP_API_URL}/api/users`)
+          apiFetch(`/api/projects/${user.id}`, { method: "GET" }),
+          apiFetch(`/api/users`, { method: "GET" }),
         ]);
-
-        const users = Array.isArray(usersRes.data) ? usersRes.data : [];
+        const projData = await projRes.json();
+        const usersData = await usersRes.json();
+        
+        const users = Array.isArray(usersData) ? usersData : [];
         const uById = users.reduce((acc, u) => {
           acc[u.id] = { name: u.name, email: u.email };
           return acc;
         }, {});
 
-        const transformed = (projRes.data || []).map((p) => ({
+        const transformed = (projData || []).map((p) => ({
           ...p,
           // attach ownerName/email if we can
           ownerName: uById[p.owner]?.name,
@@ -75,15 +79,17 @@ const DashboardHome = () => {
 
   const refreshProjectsForUser = async () => {
     const [projRes, usersRes] = await Promise.all([
-      axios.get(`${process.env.REACT_APP_API_URL}/api/projects/${user.id}`),
-      axios.get(`${process.env.REACT_APP_API_URL}/api/users`)
+      apiFetch(`/api/projects/${user.id}`, { method: "GET" }),
+      apiFetch(`/api/users`, { method: "GET" }),
     ]);
-    const users = Array.isArray(usersRes.data) ? usersRes.data : [];
+    const projData = await projRes.json();
+    const usersData = await usersRes.json();
+    const users = Array.isArray(usersData) ? usersData : [];
     const uById = users.reduce((acc, u) => {
       acc[u.id] = { name: u.name, email: u.email };
       return acc;
     }, {});
-    const transformed = (projRes.data || []).map((p) => ({
+    const transformed = (projData || []).map((p) => ({
       ...p,
       ownerName: uById[p.owner]?.name,
       ownerEmail: uById[p.owner]?.email,
@@ -97,13 +103,19 @@ const DashboardHome = () => {
     if (!newProjectName.trim() || !user?.id) return;
 
     try {
-      await axios.post(`${process.env.REACT_APP_API_URL}/api/projects`, {
-        name: newProjectName,
-        createdBy: user.id,
-        description: "",
-        status: "Active",
+      const res = await apiFetch(`/api/projects`, {
+        method: "POST",
+        body: JSON.stringify({
+          name: newProjectName,
+          createdBy: user.id,
+          description: "",
+          status: "Active",
+        }),
       });
-
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || "Failed to create project in DashboardHome.handleCreateProject");
+    }
       await refreshProjectsForUser();
       setNewProjectName("");
       setShowCreateProject(false);
@@ -126,13 +138,17 @@ const handleChangeOwner = async (project) => {
   if (!user?.id) return;
   try {
     // fetch project to get member IDs
-    const pres = await axios.get(`${process.env.REACT_APP_API_URL}/api/project/${project.id}`);
-    const memberIds = pres.data?.members || [];
+    // const pres = await axios.get(`${process.env.REACT_APP_API_URL}/api/project/${project.id}`);
+    const pres = await apiFetch(`/api/project/${project.id}`, {
+      method: "GET",     
+    });
+    const presData = await pres.json();
+    const memberIds = presData?.members || [];
 
     // fetch all users to map IDs -> names/emails
-    const ures = await axios.get(`${process.env.REACT_APP_API_URL}/api/users`);
-    const allUsers = Array.isArray(ures.data) ? ures.data : [];
-
+    const ures = await apiFetch(`/api/users`, { method: "GET" });
+    const uresData = await ures.json()
+    const allUsers = Array.isArray(uresData) ? uresData : [];
     const options = allUsers
       .filter(u => memberIds.includes(String(u.id)))
       .map(u => ({
@@ -160,11 +176,14 @@ const handleChangeOwner = async (project) => {
     if (!editingProject?.id || !ownerEmailInput.trim() || !user?.id) return;
 
     try {
-      await axios.put(
-        `${process.env.REACT_APP_API_URL}/api/projects/${editingProject.id}/owner`,
-        { ownerEmail: ownerEmailInput.trim() },
-        { headers: { "X-User-Id": user.id } }
-      );
+      const res = await apiFetch(`/api/projects/${editingProject.id}/owner`, {
+        method: "PUT",
+        body: JSON.stringify({ ownerEmail: ownerEmailInput.trim() }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to change owner");
+      }
 
       await refreshProjectsForUser();
       setShowChangeOwner(false);
@@ -194,10 +213,20 @@ const handleChangeOwner = async (project) => {
       return;
     }
     try {
-      await axios.delete(
-        `${process.env.REACT_APP_API_URL}/api/projects/${project.id}`,
-        { headers: { "X-User-Id": user.id } }
-      );
+      // await axios.delete(
+      //   `${process.env.REACT_APP_API_URL}/api/projects/${project.id}`,
+      //   { headers: { "X-User-Id": user.id } }
+      // );
+      const res = await apiFetch(`/api/projects/${project.id}`, {
+        method: "DELETE",        
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(
+          error.error ||
+            "Failed to delete project DashboardHome.handleDeleteProject"
+        );
+      }
       await refreshProjectsForUser();
       window.dispatchEvent(new Event("projects:refresh"));
     } catch (error) {
@@ -211,11 +240,20 @@ const handleChangeOwner = async (project) => {
     if (!newProjectName.trim() || !editingProject?.id || !user?.id) return;
 
     try {
-      await axios.put(
-        `${process.env.REACT_APP_API_URL}/api/projects/${editingProject.id}/name`,
-        { projectName: newProjectName },
-        { headers: { "X-User-Id": user.id } }
-      );
+      // await axios.put(
+      //   `${process.env.REACT_APP_API_URL}/api/projects/${editingProject.id}/name`,
+      //   { projectName: newProjectName },
+      //   { headers: { "X-User-Id": user.id } }
+      // );
+      const res = await apiFetch(`api/projects/${editingProject.id}/name`, {
+        method: "PUT",
+        body: JSON.stringify({ projectName: newProjectName }),
+        // "X-User-Id": user.id
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to change owner");
+      }
 
       await refreshProjectsForUser();
       setNewProjectName("");
