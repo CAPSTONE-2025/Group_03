@@ -13,8 +13,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
-CORS(app, origins=["http://localhost:3000"])  # CORS for frontend
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+CORS(
+    app,
+    origins=[FRONTEND_URL, "http://localhost:3000"],  # keep localhost for dev if you want
+    supports_credentials=True,
+)
 
 # Email configuration
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
