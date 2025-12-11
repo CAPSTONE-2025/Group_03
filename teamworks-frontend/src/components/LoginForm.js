@@ -16,8 +16,7 @@ export default function LoginForm({ setIsAuthenticated }) {
 
     const onSubmit = async (data) => {
         try {
-            console.log("Sending login data to backend:", data);
-            console.log("API:", process.env.REACT_APP_API_URL); // Log the API URL
+
             const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/login`, {
                 method: "POST",
                 headers: {
@@ -28,7 +27,17 @@ export default function LoginForm({ setIsAuthenticated }) {
 
             const result = await response.json();
             if (response.ok) {
-                console.log("Login successful, setting user:", result.user);
+                // console.log({
+                //   message: "Login successful",
+                //   id: result.user.id,
+                //   access_token: result.access_token,
+                // });
+                // store token after login
+                localStorage.setItem('access_token', result.access_token);
+                // store user.id after login
+                localStorage.setItem("user_id", result.user.id);
+                // store user after login
+                localStorage.setItem('user', JSON.stringify(result.user));
                 setIsAuthenticated(result.user);  
                 // Add a small delay to ensure state is updated
                 setTimeout(() => {

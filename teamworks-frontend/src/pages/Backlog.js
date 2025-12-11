@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import axios from "axios";
+import { apiFetch } from "../utils/apiClient";
+
 import { useParams, useNavigate } from "react-router-dom";
 
 import AddTaskForm from "../components/AddTaskForm";
@@ -109,18 +111,26 @@ function Backlog() {
 
     (async () => {
       try {
-        const pres = await axios.get(
-          `${process.env.REACT_APP_API_URL}/api/project/${projectId}`
-        );
-        setProjectName(pres.data.name);
-        setProjectStatus(pres.data.status || "Active");
+        const pres = await apiFetch(`/api/project/${projectId}`, {
+          method: "GET",
+        });
+        const presData = await pres.json();
+        
+        setProjectName(presData.name);
+        setProjectStatus(presData.status || "Active");
 
-        const memberIdsFromRes = pres.data.members || [];
+        const memberIdsFromRes = presData.members || [];
         setMemberIds(memberIdsFromRes);
-        setOwnerId(pres.data.owner || null);
+        setOwnerId(presData.owner || null);
 
-        const ures = await axios.get(`${process.env.REACT_APP_API_URL}/api/users`);
-        const allUsers = Array.isArray(ures.data) ? ures.data : [];
+        // const ures = await axios.get(
+        //   `${process.env.REACT_APP_API_URL}/api/users`
+        // );
+        const ures = await apiFetch(`/api/users`, {
+          method: "GET",
+        });
+        const uresData = await ures.json()
+        const allUsers = Array.isArray(uresData) ? uresData : [];
         const onlyMembers = allUsers.filter((u) =>
           memberIdsFromRes.includes(String(u.id))
         );

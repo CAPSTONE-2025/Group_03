@@ -6,6 +6,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [token, setToken] = useState(null);
 
   const buildFullName = (u) => {
     if (!u) return null;
@@ -18,25 +19,33 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuth = () => {
       const storedUser = localStorage.getItem("user");
-      // console.log("Checking auth, stored user:", storedUser);
+      const storedToken = localStorage.getItem("access_token");
+      const storedUserId = localStorage.getItem("user_id");
+      // console.log("Checking auth, stored user:", {
+      //   user: storedUser,
+      //   JWTtoken: storedToken,
+      //   userId: storedUserId,
+      // });
       if (storedUser) {
         try {
           let userData = JSON.parse(storedUser);
           userData = buildFullName(userData);
 
           if (userData && userData.id) {
-            // console.log("User authenticated from localStorage:", userData);
             setUser(userData);
             setIsAuthenticated(true);
+            setToken(storedToken);
           } else {
             // console.log("Invalid user data, removing from localStorage");
             localStorage.removeItem("user");
             setIsAuthenticated(false);
+            setToken(null);
           }
         } catch (error) {
           console.error("Error parsing user data:", error);
           localStorage.removeItem("user");
           setIsAuthenticated(false);
+          setToken(null);
         }
       } else {
         console.log("No stored user found");
@@ -58,19 +67,23 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const handleLogin = (userData) => {
-    console.log("handleLogin called with:", userData);
     const normalizedUser = buildFullName(userData);
-    console.log("Normalized user:", normalizedUser);
+    const storedToken = localStorage.getItem("access_token");
+    // console.log("Normalized user:", normalizedUser);
     setUser(normalizedUser);
     setIsAuthenticated(true);
+    setToken(storedToken);
     localStorage.setItem("user", JSON.stringify(normalizedUser));
-    console.log("User saved to localStorage");
   };
 
   const handleLogout = () => {
     setUser(null);
     setIsAuthenticated(false);
+    setToken(null);
     localStorage.removeItem("user");
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user_id");
+    // if (navigate) navigate("/login"); do this later. navigate back to login page
   };
 
   return (
@@ -83,6 +96,7 @@ export const AuthProvider = ({ children }) => {
         isLoading,
         handleLogin,
         handleLogout,
+        token,
       }}
     >
       {children}
